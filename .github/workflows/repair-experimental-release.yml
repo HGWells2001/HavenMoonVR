@@ -1,0 +1,121 @@
+name: Repair experimental release package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/HavenMoonVR.ExperimentalLauncher.cs'
+      - '.github/workflows/repair-experimental-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair-release:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Compile experimental launcher
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path $csc)) { throw "C# compiler not found: $csc" }
+          & $csc /nologo /target:winexe /optimize+ `
+            "/out:$PWD\Haven Moon VR Experimental.exe" `
+            /reference:System.dll /reference:System.Windows.Forms.dll `
+            'src\HavenMoonVR.ExperimentalLauncher.cs'
+          if ($LASTEXITCODE -ne 0) { throw 'Experimental launcher compilation failed.' }
+          if (-not (Test-Path 'Haven Moon VR Experimental.exe')) { throw 'Launcher output is missing.' }
+
+      - name: Repair latest 1.1.1 experimental ZIP
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $releases = gh release list --limit 50 --json tagName,name,isDraft,isPrerelease,publishedAt | ConvertFrom-Json
+          $release = $releases | Where-Object {
+            (-not $_.isDraft) -and (($_.name -match '1\.1\.1') -or ($_.tagName -match '1\.1\.1'))
+          } | Select-Object -First 1
+          if (-not $release) {
+            $release = $releases | Where-Object { (-not $_.isDraft) -and $_.isPrerelease } | Select-Object -First 1
+          }
+          if (-not $release) { throw 'No experimental GitHub Release was found.' }
+
+          $tag = $release.tagName
+          Write-Host "Repairing release $tag"
+
+          $releaseInfo = gh release view $tag --json assets | ConvertFrom-Json
+          $zipAsset = $releaseInfo.assets | Where-Object { $_.name -match '(?i)\.zip$' } | Select-Object -First 1
+          if (-not $zipAsset) { throw "Release $tag has no ZIP asset." }
+
+          $work = Join-Path $env:RUNNER_TEMP 'hmvr-release-repair'
+          $download = Join-Path $work 'download'
+          $extract = Join-Path $work 'extract'
+          $output = Join-Path $work 'output'
+          Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $download,$extract,$output | Out-Null
+
+          gh release download $tag --pattern $zipAsset.name --dir $download
+          $zipPath = Join-Path $download $zipAsset.name
+          if (-not (Test-Path $zipPath)) { throw "Downloaded ZIP is missing: $zipPath" }
+
+          Expand-Archive -LiteralPath $zipPath -DestinationPath $extract -Force
+          $installer = Get-ChildItem -LiteralPath $extract -Recurse -Filter 'Install_HavenMoonVR.cmd' | Select-Object -First 1
+          if (-not $installer) { throw 'Install_HavenMoonVR.cmd was not found inside the release ZIP.' }
+          $packageRoot = $installer.Directory.FullName
+
+          $required = @(
+            'Start_HavenMoonVR_Experimental.cmd',
+            'HavenMoonVR_InputBridge_Experimental.ps1',
+            'HavenMoonVR_Experimental_Display.ini',
+            'Runtime\HavenMoonVR.Experimental.dll',
+            'Runtime\HavenMoonVR.AssemblyPatcher.exe',
+            'Runtime\Mono.Cecil.dll',
+            'Runtime\HavenMoonVR.SteamShortcutTool.exe'
+          )
+          foreach ($relative in $required) {
+            $candidate = Join-Path $packageRoot $relative
+            if (-not (Test-Path -LiteralPath $candidate)) {
+              throw "Release ZIP is incomplete beyond the launcher; missing: $relative"
+            }
+          }
+
+          Copy-Item -LiteralPath 'Haven Moon VR Experimental.exe' -Destination (Join-Path $packageRoot 'Haven Moon VR Experimental.exe') -Force
+
+          $fixedZip = Join-Path $output $zipAsset.name
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            $extract,
+            $fixedZip,
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false
+          )
+
+          # Final content check before replacing the public asset.
+          $verify = Join-Path $work 'verify'
+          Expand-Archive -LiteralPath $fixedZip -DestinationPath $verify -Force
+          $launcher = Get-ChildItem -LiteralPath $verify -Recurse -Filter 'Haven Moon VR Experimental.exe' | Select-Object -First 1
+          if (-not $launcher) { throw 'Final repaired ZIP still has no experimental launcher.' }
+          if ($launcher.Length -le 0) { throw 'Experimental launcher in final ZIP is empty.' }
+
+          $hash = (Get-FileHash -LiteralPath $fixedZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksumAsset = $releaseInfo.assets | Where-Object { $_.name -match '(?i)(sha256|checksum).*\.txt$' } | Select-Object -First 1
+          if ($checksumAsset) {
+            $checksumName = $checksumAsset.name
+          } else {
+            $checksumName = ([IO.Path]::GetFileNameWithoutExtension($zipAsset.name) + '_SHA256.txt')
+          }
+          $checksumPath = Join-Path $output $checksumName
+          Set-Content -LiteralPath $checksumPath -Value "$hash  $($zipAsset.name)" -Encoding ASCII
+
+          gh release upload $tag $fixedZip --clobber
+          gh release upload $tag $checksumPath --clobber
+
+          Write-Host "Repaired asset: $($zipAsset.name)"
+          Write-Host "SHA-256: $hash"
