@@ -23,6 +23,7 @@ Before publishing a ZIP:
 2. Compile the embedded OpenVR C# block.
 3. Load and inspect both managed assemblies against the supported Unity runtime.
 4. Run install, verify, uninstall and clean-hash restoration on an isolated copy of the supported game.
-5. Verify Steam `shortcuts.vdf` add/remove round-trips byte-for-byte on test copies.
-6. Generate `FILE_HASHES_SHA256.txt`, extract the final ZIP and compare every file hash.
-7. Publish a separate SHA-256 checksum for the ZIP.
+5. Run the installer twice and verify that the second pass reports zero file updates without changing hashes or modification times; then alter one installed runtime file and verify that only that file is repaired.
+6. Verify Steam `shortcuts.vdf` add/remove round-trips byte-for-byte on test copies.
+7. Generate `FILE_HASHES_SHA256.txt`, extract the final ZIP and compare every file hash.
+8. Publish a separate SHA-256 checksum for the ZIP.

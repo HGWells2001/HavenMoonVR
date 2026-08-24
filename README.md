@@ -29,7 +29,7 @@ Head-relative locomotion, right-stick turning, FXAA, VR Origin, automatic height
 
 The entry containing **Experimental** must be used. The older stable shortcut starts the 1.0.2 bridge, which does not publish the two controller poses.
 
-The installer accepts only the verified Steam game build, keeps a clean backup, copies the experimental runtime into the game directory, backs up `shortcuts.vdf`, and adds or updates only the `Haven Moon VR Experimental` VR-library shortcut. It locally embeds the icon from the user's installed `HavenMoon.exe` in the copied launcher and also gives Steam that original executable as its icon source. No game artwork is included in this package.
+The installer accepts only the verified Steam game build and keeps a verified clean backup. It compares the SHA-256 hash of every generated game patch and experimental runtime file, updates only files that are missing or different, and leaves already-current files and their modification times untouched. The user's existing experimental display configuration is preserved. It also backs up `shortcuts.vdf` and adds or updates only the `Haven Moon VR Experimental` VR-library shortcut. The launcher locally embeds the icon from the user's installed `HavenMoon.exe`, and Steam uses that original executable as its icon source. No game artwork is included in this package.
 
 ## Controls
 

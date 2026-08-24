@@ -101,6 +101,33 @@ function Get-BytesSha256([byte[]]$Bytes) {
 }
 function Get-FileSha256([string]$Path) { return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
 
+function Copy-FileIfChanged([string]$Source,[string]$Destination,[string]$Label) {
+    if(-not(Test-Path -LiteralPath $Source)){throw "Source file missing: $Source"}
+    $expected=Get-FileSha256 $Source
+    if((Test-Path -LiteralPath $Destination)-and((Get-FileSha256 $Destination)-eq $expected)){
+        Write-Host ("Already current: {0}" -f $Label) -ForegroundColor DarkGray
+        return $false
+    }
+    $parent=Split-Path -Parent $Destination
+    if($parent-and-not(Test-Path -LiteralPath $parent)){New-Item -ItemType Directory -Path $parent|Out-Null}
+    Copy-Item -LiteralPath $Source -Destination $Destination -Force
+    if((Get-FileSha256 $Destination)-ne $expected){throw "File verification failed after update: $Destination"}
+    Write-Host ("Updated: {0}" -f $Label) -ForegroundColor Green
+    return $true
+}
+
+function Write-BytesIfChanged([string]$Destination,[byte[]]$Bytes,[string]$Label) {
+    $expected=Get-BytesSha256 $Bytes
+    if((Test-Path -LiteralPath $Destination)-and((Get-FileSha256 $Destination)-eq $expected)){
+        Write-Host ("Already current: {0}" -f $Label) -ForegroundColor DarkGray
+        return $false
+    }
+    [IO.File]::WriteAllBytes($Destination,$Bytes)
+    if((Get-FileSha256 $Destination)-ne $expected){throw "Patched file verification failed after update: $Destination"}
+    Write-Host ("Updated: {0}" -f $Label) -ForegroundColor Green
+    return $true
+}
+
 function Write-U32LE([byte[]]$Bytes,[int]$Offset,[uint32]$Value) {
     [byte[]]$v=[BitConverter]::GetBytes($Value); [Array]::Copy($v,0,$Bytes,$Offset,4)
 }
@@ -199,6 +226,7 @@ function Invoke-SteamShortcut([ValidateSet('add','remove')][string]$Action,[stri
 }
 
 function Install-ExperimentalRuntimeFiles([string]$GameDir) {
+    $updated=0
     $rootFiles=@(
         'Haven Moon VR Experimental.exe',
         'Start_HavenMoonVR_Experimental.cmd',
@@ -211,29 +239,54 @@ function Install-ExperimentalRuntimeFiles([string]$GameDir) {
         if(-not(Test-Path -LiteralPath $source)){throw "Experimental runtime file missing: $source"}
         if($name-eq 'HavenMoonVR_Experimental_Display.ini' -and (Test-Path -LiteralPath $destination)){
             Write-Host 'Existing experimental display configuration kept.' -ForegroundColor DarkGray
+        }elseif($name-eq 'Haven Moon VR Experimental.exe' -and (Test-Path -LiteralPath $destination)){
+            # Keep a previously icon-enabled launcher. The icon installer below
+            # verifies its source marker and rebuilds it only when required.
+            Write-Host 'Existing experimental launcher retained for incremental icon verification.' -ForegroundColor DarkGray
         }else{
-            Copy-Item -LiteralPath $source -Destination $destination -Force
+            if(Copy-FileIfChanged $source $destination $name){$updated++}
         }
     }
 
     $helperSource=Join-Path $PSScriptRoot 'Runtime\HavenMoonVR.Experimental.dll'
     $helperDestination=Join-Path $GameDir 'HavenMoon_Data\Managed\HavenMoonVR.Experimental.dll'
     if(-not(Test-Path -LiteralPath $helperSource)){throw "Experimental in-game runtime missing: $helperSource"}
-    Copy-Item -LiteralPath $helperSource -Destination $helperDestination -Force
+    if(Copy-FileIfChanged $helperSource $helperDestination 'HavenMoonVR.Experimental.dll'){$updated++}
     if((Get-FileSha256 $helperDestination)-ne $ExperimentalHelperSha256){throw 'Experimental in-game runtime verification failed after copy.'}
 
-    @($rootFiles+'HavenMoon_Data\Managed\HavenMoonVR.Experimental.dll') |
+    @($rootFiles+'HavenMoon_Data\Managed\HavenMoonVR.Experimental.dll'+'.havenmoonvr_experimental_launcher_build.txt') |
         Set-Content -LiteralPath (Join-Path $GameDir '.havenmoonvr_1_1_experimental_runtime_files.txt') -Encoding UTF8
+    return $updated
 }
 
 function Install-LauncherWithLocalGameIcon([string]$GameDir) {
     $gameExe=Join-Path $GameDir 'HavenMoon.exe'
     $launcher=Join-Path $GameDir 'Haven Moon VR Experimental.exe'
     $launcherSource=Join-Path $PSScriptRoot 'Runtime\HavenMoonVR.ExperimentalLauncher.cs'
+    $buildMarker=Join-Path $GameDir '.havenmoonvr_experimental_launcher_build.txt'
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
     if(-not(Test-Path -LiteralPath $launcherSource)-or-not(Test-Path -LiteralPath $csc)){
         Write-Host 'Local launcher-icon embedding is unavailable; Steam will still use the original game icon.' -ForegroundColor Yellow
         return $false
+    }
+
+    $expectedMarker=@(
+        'format=1',
+        ('launcher_source_sha256='+(Get-FileSha256 $launcherSource)),
+        ('game_exe_sha256='+(Get-FileSha256 $gameExe)),
+        'platform=AnyCPU',
+        'icon=HavenMoon.exe'
+    )-join "`n"
+    if((Test-Path -LiteralPath $launcher)-and(Test-Path -LiteralPath $buildMarker)){
+        $currentMarker=(Get-Content -LiteralPath $buildMarker -Raw).Trim() -replace "`r`n","`n"
+        $markerLines=@($currentMarker -split "`n")
+        $recordedHashLine=$markerLines|Where-Object{$_-like 'launcher_sha256=*'}|Select-Object -First 1
+        $recordedHash=if($recordedHashLine){$recordedHashLine.Substring('launcher_sha256='.Length)}else{''}
+        $recordedBase=@($markerLines|Where-Object{$_-notlike 'launcher_sha256=*'})-join "`n"
+        if($recordedBase-eq $expectedMarker-and$recordedHash-and(Get-FileSha256 $launcher)-eq$recordedHash){
+            Write-Host 'Already current: icon-enabled experimental launcher.' -ForegroundColor DarkGray
+            return $true
+        }
     }
 
     $tempDir=Join-Path ([IO.Path]::GetTempPath()) ('HavenMoonVR-LauncherIcon-'+[Guid]::NewGuid().ToString('N'))
@@ -280,6 +333,8 @@ function Install-LauncherWithLocalGameIcon([string]$GameDir) {
         $embeddedBitmap=$embeddedIcon.ToBitmap();$embeddedBitmap.Save($embeddedPng,[Drawing.Imaging.ImageFormat]::Png)
         if((Get-FileSha256 $sourcePng)-ne(Get-FileSha256 $embeddedPng)){throw 'The embedded launcher icon does not match the original game icon.'}
         Copy-Item -LiteralPath $builtLauncher -Destination $launcher -Force
+        $launcherHash=Get-FileSha256 $launcher
+        [IO.File]::WriteAllText($buildMarker,$expectedMarker+"`nlauncher_sha256="+$launcherHash+"`r`n",[Text.UTF8Encoding]::new($false))
         Write-Host 'Embedded the locally installed Haven Moon icon in the experimental launcher.' -ForegroundColor Green
         return $true
     }catch{
@@ -301,6 +356,7 @@ function Remove-ExperimentalRuntimeFiles([string]$GameDir) {
         'HavenMoonVR_InputBridge_Experimental.ps1',
         'HavenMoonVR_Experimental_Display.ini',
         'HavenMoon_Data\Managed\HavenMoonVR.Experimental.dll',
+        '.havenmoonvr_experimental_launcher_build.txt',
         '.havenmoonvr_1_1_experimental_runtime_files.txt'
     )
     foreach($name in $relative){
@@ -515,35 +571,38 @@ function Restore-CleanFromBackup([string]$GameDir,[bool]$Required) {
 }
 function Ensure-CleanFilesAndBackup([string]$GameDir) {
     $dataDir=Join-Path $GameDir 'HavenMoon_Data';$backupDir=Get-BackupDir $GameDir
-    $allClean=$true
-    foreach($name in $OriginalHashes.Keys){$p=Join-Path $dataDir $name;if(-not(Test-Path -LiteralPath $p) -or (Get-FileSha256 $p)-ne $OriginalHashes[$name]){$allClean=$false;break}}
-    if(-not $allClean){
-        Write-Host 'Existing HavenMoonVR/modified files detected. Restoring the clean backup first...' -ForegroundColor Yellow
-        [void](Restore-CleanFromBackup $GameDir $true)
-    }
     if(-not(Test-Path -LiteralPath $backupDir)){New-Item -ItemType Directory -Path $backupDir|Out-Null}
+
+    # Validate or create each clean backup independently. Live files are not
+    # restored here: Install-Patch compares every desired output and rewrites
+    # only files that are missing, outdated or different.
     foreach($name in $OriginalHashes.Keys){
-        $p=Join-Path $dataDir $name;if((Get-FileSha256 $p)-ne $OriginalHashes[$name]){throw "Unsupported clean file: $name"}
-        $dest=Join-Path $backupDir $name;if(-not(Test-Path -LiteralPath $dest)){Copy-Item -LiteralPath $p -Destination $dest}
+        $p=Join-Path $dataDir $name
+        $dest=Join-Path $backupDir $name
+        if(-not(Test-Path -LiteralPath $dest)){
+            if(-not(Test-Path -LiteralPath $p)){throw "Game file and clean backup are both missing: $name"}
+            $liveHash=Get-FileSha256 $p
+            if($liveHash-ne $OriginalHashes[$name]){
+                throw ("Clean backup missing for {0}, and the live file is already modified.`nLive SHA-256: {1}`nExpected clean SHA-256: {2}`nVerify the game files through Steam, then run the installer again.") -f $name,$liveHash,$OriginalHashes[$name]
+            }
+            Copy-Item -LiteralPath $p -Destination $dest
+            Write-Host ("Created verified clean backup: {0}" -f $name) -ForegroundColor Green
+        }
         if((Get-FileSha256 $dest)-ne $OriginalHashes[$name]){throw "Backup validation failed: $dest"}
     }
 
     $asmPath=Get-AssemblyPath $GameDir
-    if(-not(Test-Path -LiteralPath $asmPath)){throw "Assembly-CSharp.dll missing: $asmPath"}
-    $asmHash=Get-FileSha256 $asmPath
     $asmBackup=Join-Path $backupDir 'Assembly-CSharp.dll'
 
-    if($asmHash-ne $OriginalAssemblySha256){
-        if((Test-Path -LiteralPath $asmBackup)-and((Get-FileSha256 $asmBackup)-eq $OriginalAssemblySha256)){
-            Copy-Item -LiteralPath $asmBackup -Destination $asmPath -Force
-            $asmHash=Get-FileSha256 $asmPath
-        }else{
-            throw "Assembly-CSharp.dll is already modified and no verified clean backup exists. Restore the game assembly with Steam, then run the installer again."
-        }
+    if(-not(Test-Path -LiteralPath $asmBackup)){
+        if(-not(Test-Path -LiteralPath $asmPath)){throw "Assembly-CSharp.dll and its clean backup are both missing: $asmPath"}
+        $asmHash=Get-FileSha256 $asmPath
+        if($asmHash-ne $OriginalAssemblySha256){throw "Assembly-CSharp.dll is already modified and no verified clean backup exists. Restore the game assembly with Steam, then run the installer again."}
+        Copy-Item -LiteralPath $asmPath -Destination $asmBackup
+        Write-Host 'Created verified clean backup: Assembly-CSharp.dll' -ForegroundColor Green
     }
-    if($asmHash-ne $OriginalAssemblySha256){throw 'Unsupported clean Assembly-CSharp.dll.'}
-    if(-not(Test-Path -LiteralPath $asmBackup)){Copy-Item -LiteralPath $asmPath -Destination $asmBackup}
     if((Get-FileSha256 $asmBackup)-ne $OriginalAssemblySha256){throw "Assembly backup validation failed: $asmBackup"}
+    Write-Host 'Clean backup verified; live files will be updated individually.' -ForegroundColor DarkGray
 }
 
 function Install-Patch([string]$GameDir,[double]$Y) {
@@ -564,19 +623,20 @@ function Install-Patch([string]$GameDir,[double]$Y) {
     [void](Resolve-SteamShortcutsPath)
     Ensure-CleanFilesAndBackup $GameDir
     $dataDir=Join-Path $GameDir 'HavenMoon_Data';$backupDir=Get-BackupDir $GameDir
+    $updatedFiles=0
 
     [byte[]]$g=[IO.File]::ReadAllBytes((Join-Path $backupDir 'globalgamemanagers'));$g=Patch-GlobalManagersVR $g;$g=Patch-Controllers $g
     if((Get-BytesSha256 $g)-ne $DefaultFinalHashes['globalgamemanagers']){throw 'Internal globalgamemanagers verification failed.'}
-    [IO.File]::WriteAllBytes((Join-Path $dataDir 'globalgamemanagers'),$g)
+    if(Write-BytesIfChanged (Join-Path $dataDir 'globalgamemanagers') $g 'globalgamemanagers'){$updatedFiles++}
 
     [byte[]]$l0=[IO.File]::ReadAllBytes((Join-Path $backupDir 'level0'));$l0=Patch-Level $l0 $LevelPatches['level0']
     if((Get-BytesSha256 $l0)-ne $DefaultFinalHashes['level0']){throw 'Internal level0 verification failed.'}
-    [IO.File]::WriteAllBytes((Join-Path $dataDir 'level0'),$l0)
+    if(Write-BytesIfChanged (Join-Path $dataDir 'level0') $l0 'level0'){$updatedFiles++}
 
     foreach($name in @('level1','level2','level3','level4','level5','level6')){
         [byte[]]$clean=[IO.File]::ReadAllBytes((Join-Path $backupDir $name));[byte[]]$patched=Patch-SceneWithVROrigin $clean $name ([single]$Y)
         if([Math]::Abs($Y+1.0)-lt 0.000001){$h=Get-BytesSha256 $patched;if($h-ne $DefaultFinalHashes[$name]){throw "Internal $name verification failed: $h"}}
-        [IO.File]::WriteAllBytes((Join-Path $dataDir $name),$patched);Write-Host "Patched $name (VR Origin $Y m)"
+        if(Write-BytesIfChanged (Join-Path $dataDir $name) $patched ("{0} (VR Origin {1} m)" -f $name,$Y)){$updatedFiles++}
     }
 
     # VR anti-aliasing profile patch. The Normal profile is already FXAA
@@ -584,23 +644,21 @@ function Install-Patch([string]$GameDir,[double]$Y) {
     # to ExtremeQuality so both quality modes use the strongest built-in FXAA.
     [byte[]]$sharedClean=[IO.File]::ReadAllBytes((Join-Path $backupDir 'sharedassets1.assets'))
     [byte[]]$sharedPatched=Patch-PostProcessingAA $sharedClean
-    [IO.File]::WriteAllBytes((Join-Path $dataDir 'sharedassets1.assets'),$sharedPatched)
-    Write-Host 'Patched sharedassets1.assets: FXAA ExtremeQuality enabled for both PostProcessing profiles.'
+    if(Write-BytesIfChanged (Join-Path $dataDir 'sharedassets1.assets') $sharedPatched 'sharedassets1.assets (FXAA ExtremeQuality)'){$updatedFiles++}
 
     # Experimental runtime hook: the original centre-screen interaction block is
     # bypassed and replaced by two independent controller rays. Height recenter
     # remains automatic per scene and available manually with F8/Y.
     [byte[]]$asmClean=[IO.File]::ReadAllBytes((Join-Path $backupDir 'Assembly-CSharp.dll'))
     [byte[]]$asmPatched=Patch-AssemblyExperimental $asmClean (Join-Path $GameDir 'HavenMoon_Data\Managed')
-    [IO.File]::WriteAllBytes((Get-AssemblyPath $GameDir),$asmPatched)
-    Write-Host 'Patched Assembly-CSharp.dll: experimental dual-controller interaction hook enabled.'
+    if(Write-BytesIfChanged (Get-AssemblyPath $GameDir) $asmPatched 'Assembly-CSharp.dll (experimental dual-controller hook)'){$updatedFiles++}
 
     $plugins=Join-Path $dataDir 'Plugins';if(-not(Test-Path -LiteralPath $plugins)){New-Item -ItemType Directory -Path $plugins|Out-Null}
     $openVrDest=Join-Path $plugins 'openvr_api.dll'
     if(Test-Path -LiteralPath $openVrDest){if((Get-PeMachine $openVrDest)-ne 0x14c){throw 'Existing openvr_api.dll is not Win32/x86.'};Write-Host 'Existing Win32 openvr_api.dll kept.'}
     else{$srcOpenVr=Resolve-OpenVrPath $OpenVrPath;Copy-Item -LiteralPath $srcOpenVr -Destination $openVrDest;$copiedHash=Get-FileSha256 $openVrDest;Set-Content -LiteralPath (Join-Path $plugins '.havenmoonvr_openvr_copied') -Value $copiedHash -Encoding ASCII;Write-Host 'Copied Win32 openvr_api.dll from the local SteamVR installation.'}
 
-    Install-ExperimentalRuntimeFiles $GameDir
+    $updatedFiles += [int](Install-ExperimentalRuntimeFiles $GameDir)
     [bool]$launcherIconEmbedded=Install-LauncherWithLocalGameIcon $GameDir
     Invoke-SteamShortcut add $GameDir
 
@@ -617,6 +675,7 @@ function Install-Patch([string]$GameDir,[double]$Y) {
     )|Set-Content -LiteralPath (Join-Path $backupDir 'HavenMoonVR_install_info.txt') -Encoding UTF8
     Write-Host ''
     Write-Host "$ModName installed." -ForegroundColor Green
+    Write-Host ("Game/runtime files updated: {0}. Already-current files were left untouched." -f $updatedFiles) -ForegroundColor Green
     Write-Host 'Steam shortcut: Haven Moon VR Experimental (VR library enabled, original game icon).'
     Write-Host 'IMPORTANT: start the exact entry "Haven Moon VR Experimental", not the older stable shortcut.' -ForegroundColor Yellow
 }

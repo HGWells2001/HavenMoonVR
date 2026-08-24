@@ -4,6 +4,8 @@ Created by Massimo Giannelli using ChatGPT in Florence, Italy.
 
 ## Unreleased
 
+- Added an incremental SHA-256 installation pass. Every generated game patch and experimental runtime file is compared with the required version before writing, so already-current files remain untouched and only missing or different files are updated.
+- Clean backups are now validated independently and are no longer restored over the live installation during a normal update. The original launcher icon build is also cached and rebuilt only when its source inputs change.
 - Synchronized each shared controller-action flag with the same hysteresis latch used by its virtual Fire1/Fire2 key. The target no longer stops receiving activation before Unity sees the key release.
 - Added a three-frame release allowance and a 0.18-second recent-target memory per hand, preventing short trigger-induced aim movement or input timing from dropping a click.
 - Added a VR-safe ocean fallback: the experimental runtime disconnects the legacy planar-reflection pass, selects the low non-reflective Water4 shader and disables its screen-space edge blend. This removes the roll-dependent black horizon at the cost of simpler-looking water.

@@ -32,8 +32,10 @@ Locomozione relativa alla testa, rotazione con stick destro, FXAA, VR Origin, re
 L'installer:
 
 - accetta soltanto la build Steam di Haven Moon già verificata;
-- usa o crea un backup pulito dei file originali;
-- copia solo i componenti sperimentali necessari nella cartella del gioco;
+- usa o crea un backup pulito verificato dei file originali;
+- calcola l'hash SHA-256 di ogni file e aggiorna soltanto quelli mancanti, diversi o non aggiornati;
+- lascia completamente intatti i file già corretti, compresa la data di ultima modifica;
+- conserva la configurazione video sperimentale già scelta dall'utente;
 - crea un backup di `shortcuts.vdf` prima di aggiornarlo;
 - incorpora localmente nel launcher l'icona della copia installata di `HavenMoon.exe` e usa la stessa origine per l'icona mostrata da Steam;
 - aggiunge o aggiorna il solo collegamento `Haven Moon VR Experimental` con `OpenVR = 1`;
