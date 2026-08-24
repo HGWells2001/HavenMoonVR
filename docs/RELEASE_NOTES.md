@@ -1,9 +1,14 @@
-# HavenMoonVR 1.1.1 Experimental
+# HavenMoonVR 1.1.1 Experimental — Incremental Installer v4
 
 Created by Massimo Giannelli using ChatGPT in Florence, Italy.
 
 ## 1.1.1 hotfix
 
+- Incremental Installer v4 checks every generated game patch and experimental runtime file by SHA-256. Only missing, different or outdated files are written; already-current files and their modification times remain untouched.
+- Verified clean backups are checked independently instead of being restored over every live file during a normal update. The local icon-enabled launcher is rebuilt only when its source inputs have changed.
+- Trigger Fix v3 synchronizes the shared left/right action flags with the hysteresis-latched Fire2/Fire1 state, adds a three-frame release allowance and remembers the recent target for 0.18 seconds.
+- Horizon Fix v2 disconnects the legacy planar-reflection pass, selects the low non-reflective Water4 shader and disables screen-space edge blending, removing the roll-dependent black horizon.
+- The launcher embeds the icon from the user's local `HavenMoon.exe`, remains AnyCPU and explicitly starts 64-bit Windows PowerShell for SteamVR's OpenVR DLL.
 - Controller rays now remain visible in a dim state whenever SteamVR provides valid poses.
 - Valid interactable targets brighten the corresponding ray and display its surface dot.
 - Height recenter now compensates Haven Moon's existing 0.683 m camera offset instead of counting it twice.

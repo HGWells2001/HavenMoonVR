@@ -1,8 +1,12 @@
-# HavenMoonVR 1.1.1 Experimental
+# HavenMoonVR 1.1.1 Experimental — Incremental Installer v4
 
 **HavenMoonVR was created by Massimo Giannelli using ChatGPT in Florence, Italy.**
 
-[Italiano](README_IT.md) · [Download the latest release](https://github.com/HGWells2001/HavenMoonVR/releases/latest) · [Troubleshooting](docs/TROUBLESHOOTING_EN.md)
+[Italiano](README_IT.md) · [Download the v4 ZIP](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.1.1-experimental/HavenMoonVR_1.1.1-Experimental.zip) · [Checksum](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.1.1-experimental/HavenMoonVR_1.1.1-Experimental_SHA256.txt) · [Troubleshooting](docs/TROUBLESHOOTING_EN.md)
+
+> **Current public build:** Incremental Installer v4 — SHA-256 `f4f64c8ef456f60ebfcd8151cab54497cd9fb0428e49d3b0f49616d99265439c`.
+>
+> Use the **Download the v4 ZIP** link above. GitHub's **Code → Download ZIP** button downloads the project source, not the complete installable package.
 
 Unofficial PC VR prototype for Haven Moon, derived from the stable 1.0.2 line. This build replaces the fixed gameplay centre pointer with two independent tracked-controller rays.
 

@@ -2,7 +2,7 @@
 
 Created by Massimo Giannelli using ChatGPT in Florence, Italy.
 
-## Unreleased
+## 1.1.1 Experimental — Incremental Installer v4
 
 - Added an incremental SHA-256 installation pass. Every generated game patch and experimental runtime file is compared with the required version before writing, so already-current files remain untouched and only missing or different files are updated.
 - Clean backups are now validated independently and are no longer restored over the live installation during a normal update. The original launcher icon build is also cached and rebuilt only when its source inputs change.
