@@ -194,7 +194,12 @@ function Invoke-SteamShortcut([ValidateSet('add','remove')][string]$Action,[stri
     if($Action-eq 'remove' -and -not(Test-Path -LiteralPath $vdf)){return}
     if($Action-eq 'add'){
         $launcher=Join-Path $GameDir 'Haven Moon VR Experimental.exe'
-        & $tool add $vdf $launcher $SteamShortcutName | ForEach-Object {Write-Host $_ -ForegroundColor DarkGray}
+        # Keep the experimental launcher as Steam's executable while using the
+        # original, locally installed game executable as its icon source. This
+        # gives the non-Steam entry the authentic Haven Moon icon without
+        # redistributing game artwork in the HavenMoonVR package.
+        $gameIcon=Join-Path $GameDir 'HavenMoon.exe'
+        & $tool add $vdf $launcher $SteamShortcutName $gameIcon | ForEach-Object {Write-Host $_ -ForegroundColor DarkGray}
     }else{
         & $tool remove $vdf $SteamShortcutName | ForEach-Object {Write-Host $_ -ForegroundColor DarkGray}
     }
@@ -227,6 +232,74 @@ function Install-ExperimentalRuntimeFiles([string]$GameDir) {
 
     @($rootFiles+'HavenMoon_Data\Managed\HavenMoonVR.Experimental.dll') |
         Set-Content -LiteralPath (Join-Path $GameDir '.havenmoonvr_1_1_experimental_runtime_files.txt') -Encoding UTF8
+}
+
+function Install-LauncherWithLocalGameIcon([string]$GameDir) {
+    $gameExe=Join-Path $GameDir 'HavenMoon.exe'
+    $launcher=Join-Path $GameDir 'Haven Moon VR Experimental.exe'
+    $launcherSource=Join-Path $PSScriptRoot 'Runtime\HavenMoonVR.ExperimentalLauncher.cs'
+    $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
+    if(-not(Test-Path -LiteralPath $launcherSource)-or-not(Test-Path -LiteralPath $csc)){
+        Write-Host 'Local launcher-icon embedding is unavailable; Steam will still use the original game icon.' -ForegroundColor Yellow
+        return $false
+    }
+
+    $tempDir=Join-Path ([IO.Path]::GetTempPath()) ('HavenMoonVR-LauncherIcon-'+[Guid]::NewGuid().ToString('N'))
+    $sourceIcon=$null;$sourceBitmap=$null;$embeddedIcon=$null;$embeddedBitmap=$null;$writer=$null;$stream=$null
+    try{
+        New-Item -ItemType Directory -Path $tempDir|Out-Null
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        $sourcePng=Join-Path $tempDir 'HavenMoon.png'
+        $icoPath=Join-Path $tempDir 'HavenMoon.ico'
+        $builtLauncher=Join-Path $tempDir 'Haven Moon VR Experimental.exe'
+        $embeddedPng=Join-Path $tempDir 'Embedded.png'
+
+        $sourceIcon=[Drawing.Icon]::ExtractAssociatedIcon($gameExe)
+        if($null-eq$sourceIcon){throw 'The original Haven Moon icon could not be extracted.'}
+        $sourceBitmap=$sourceIcon.ToBitmap()
+        $sourceBitmap.Save($sourcePng,[Drawing.Imaging.ImageFormat]::Png)
+        $width=$sourceBitmap.Width;$height=$sourceBitmap.Height
+        if($width-lt 1-or$width-gt 256-or$height-lt 1-or$height-gt 256){throw 'Unexpected original icon dimensions.'}
+
+        # Wrap the lossless PNG in a one-image ICO container. Icon.Save can
+        # reduce extracted icons to a 16-colour bitmap; the PNG form preserves
+        # the original artwork and transparency exactly.
+        [byte[]]$pngBytes=[IO.File]::ReadAllBytes($sourcePng)
+        $stream=New-Object IO.MemoryStream
+        $writer=New-Object IO.BinaryWriter($stream)
+        $writer.Write([uint16]0);$writer.Write([uint16]1);$writer.Write([uint16]1)
+        $writer.Write([byte]$(if($width-eq 256){0}else{$width}))
+        $writer.Write([byte]$(if($height-eq 256){0}else{$height}))
+        $writer.Write([byte]0);$writer.Write([byte]0);$writer.Write([uint16]1);$writer.Write([uint16]32)
+        $writer.Write([uint32]$pngBytes.Length);$writer.Write([uint32]22);$writer.Write($pngBytes);$writer.Flush()
+        [IO.File]::WriteAllBytes($icoPath,$stream.ToArray())
+        $writer.Dispose();$writer=$null;$stream.Dispose();$stream=$null
+
+        $compilerArgs=@(
+            '/nologo','/target:winexe','/platform:x86','/optimize+',
+            '/reference:System.Windows.Forms.dll',
+            ('/win32icon:'+$icoPath),('/out:'+$builtLauncher),$launcherSource
+        )
+        & $csc @compilerArgs | ForEach-Object {Write-Host $_ -ForegroundColor DarkGray}
+        if($LASTEXITCODE-ne 0-or-not(Test-Path -LiteralPath $builtLauncher)){throw 'The icon-enabled launcher could not be compiled.'}
+
+        $embeddedIcon=[Drawing.Icon]::ExtractAssociatedIcon($builtLauncher)
+        if($null-eq$embeddedIcon){throw 'The compiled launcher does not expose an icon.'}
+        $embeddedBitmap=$embeddedIcon.ToBitmap();$embeddedBitmap.Save($embeddedPng,[Drawing.Imaging.ImageFormat]::Png)
+        if((Get-FileSha256 $sourcePng)-ne(Get-FileSha256 $embeddedPng)){throw 'The embedded launcher icon does not match the original game icon.'}
+        Copy-Item -LiteralPath $builtLauncher -Destination $launcher -Force
+        Write-Host 'Embedded the locally installed Haven Moon icon in the experimental launcher.' -ForegroundColor Green
+        return $true
+    }catch{
+        Write-Host ('Launcher icon warning: '+$_.Exception.Message) -ForegroundColor Yellow
+        Write-Host 'Steam will still use the icon directly from the original HavenMoon.exe.' -ForegroundColor Yellow
+        return $false
+    }finally{
+        if($null-ne$writer){$writer.Dispose()};if($null-ne$stream){$stream.Dispose()}
+        if($null-ne$sourceBitmap){$sourceBitmap.Dispose()};if($null-ne$sourceIcon){$sourceIcon.Dispose()}
+        if($null-ne$embeddedBitmap){$embeddedBitmap.Dispose()};if($null-ne$embeddedIcon){$embeddedIcon.Dispose()}
+        if(Test-Path -LiteralPath $tempDir){Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
 }
 
 function Remove-ExperimentalRuntimeFiles([string]$GameDir) {
@@ -493,7 +566,8 @@ function Install-Patch([string]$GameDir,[double]$Y) {
         'Runtime\HavenMoonVR.Experimental.dll',
         'Runtime\HavenMoonVR.AssemblyPatcher.exe',
         'Runtime\Mono.Cecil.dll',
-        'Runtime\HavenMoonVR.SteamShortcutTool.exe'
+        'Runtime\HavenMoonVR.SteamShortcutTool.exe',
+        'Runtime\HavenMoonVR.ExperimentalLauncher.cs'
     )){if(-not(Test-Path -LiteralPath (Join-Path $PSScriptRoot $required))){throw "Package file missing: $required"}}
     [void](Resolve-SteamShortcutsPath)
     Ensure-CleanFilesAndBackup $GameDir
@@ -535,6 +609,7 @@ function Install-Patch([string]$GameDir,[double]$Y) {
     else{$srcOpenVr=Resolve-OpenVrPath $OpenVrPath;Copy-Item -LiteralPath $srcOpenVr -Destination $openVrDest;$copiedHash=Get-FileSha256 $openVrDest;Set-Content -LiteralPath (Join-Path $plugins '.havenmoonvr_openvr_copied') -Value $copiedHash -Encoding ASCII;Write-Host 'Copied Win32 openvr_api.dll from the local SteamVR installation.'}
 
     Install-ExperimentalRuntimeFiles $GameDir
+    [bool]$launcherIconEmbedded=Install-LauncherWithLocalGameIcon $GameDir
     Invoke-SteamShortcut add $GameDir
 
     Set-Content -LiteralPath (Join-Path $backupDir 'height_offset.txt') -Value ([string]::Format([Globalization.CultureInfo]::InvariantCulture,'{0:0.000}',$Y)) -Encoding ASCII
@@ -544,11 +619,12 @@ function Install-Patch([string]$GameDir,[double]$Y) {
         ('Initial VR Origin height offset: '+$Y+' m'),
         'Experimental interaction: independent left/right tracked rays; left trigger/X=Fire2; right trigger/A=Fire1',
         'Eye height: original 0.683 m camera baseline with tracked-height compensation; F7/F9 adjust by 0.05 m; automatic per scene + Y/F8 reset',
+        ('Launcher icon embedded locally from original HavenMoon.exe: '+$launcherIconEmbedded),
         'FXAA profiles=ExtremeQuality'
     )|Set-Content -LiteralPath (Join-Path $backupDir 'HavenMoonVR_install_info.txt') -Encoding UTF8
     Write-Host ''
     Write-Host "$ModName installed." -ForegroundColor Green
-    Write-Host 'Steam shortcut: Haven Moon VR Experimental (VR library enabled).'
+    Write-Host 'Steam shortcut: Haven Moon VR Experimental (VR library enabled, original game icon).'
     Write-Host 'IMPORTANT: start the exact entry "Haven Moon VR Experimental", not the older stable shortcut.' -ForegroundColor Yellow
 }
 

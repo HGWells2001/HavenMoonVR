@@ -2,6 +2,10 @@
 
 Created by Massimo Giannelli using ChatGPT in Florence, Italy.
 
+## Unreleased
+
+- The installed launcher now embeds the icon from the user's local `HavenMoon.exe`, and Steam uses that original executable as the shortcut icon source. No original game artwork is redistributed.
+
 ## 1.1.1 hotfix
 
 - Controller rays now remain visible in a dim state whenever SteamVR provides valid poses.

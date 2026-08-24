@@ -33,6 +33,7 @@ L'installer:
 - usa o crea un backup pulito dei file originali;
 - copia solo i componenti sperimentali necessari nella cartella del gioco;
 - crea un backup di `shortcuts.vdf` prima di aggiornarlo;
+- incorpora localmente nel launcher l'icona della copia installata di `HavenMoon.exe` e usa la stessa origine per l'icona mostrata da Steam;
 - aggiunge o aggiorna il solo collegamento `Haven Moon VR Experimental` con `OpenVR = 1`;
 - non include file originali di Haven Moon e copia `openvr_api.dll` dalla SteamVR locale.
 

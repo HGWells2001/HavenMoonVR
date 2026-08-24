@@ -19,7 +19,7 @@ internal static class HavenMoonVRSteamShortcutTool
     {
         if (args.Length < 3 || (args[0] != "add" && args[0] != "remove"))
         {
-            Console.Error.WriteLine("Usage: HavenMoonVR.SteamShortcutTool.exe add <shortcuts.vdf> <exe> <name>");
+            Console.Error.WriteLine("Usage: HavenMoonVR.SteamShortcutTool.exe add <shortcuts.vdf> <exe> <name> [icon]");
             Console.Error.WriteLine("       HavenMoonVR.SteamShortcutTool.exe remove <shortcuts.vdf> <name>");
             return 2;
         }
@@ -27,10 +27,13 @@ internal static class HavenMoonVRSteamShortcutTool
         try
         {
             string command = args[0];
-            if (command == "add" && args.Length != 4) throw new ArgumentException("The add command requires an executable path and app name.");
+            if (command == "add" && args.Length != 4 && args.Length != 5) throw new ArgumentException("The add command requires an executable path, app name and optional icon path.");
             if (command == "remove" && args.Length != 3) throw new ArgumentException("The remove command requires an app name.");
             string path = Path.GetFullPath(args[1]);
             string appName = command == "add" ? args[3] : args[2];
+            string iconPath = command == "add" && args.Length == 5
+                ? Path.GetFullPath(args[4])
+                : null;
 
             VdfNode root = File.Exists(path) && new FileInfo(path).Length > 0
                 ? Parse(File.ReadAllBytes(path))
@@ -42,7 +45,7 @@ internal static class HavenMoonVRSteamShortcutTool
             int preservedBefore = root.Children.Count(n =>
                 !String.Equals(GetString(n, "AppName"), appName, StringComparison.OrdinalIgnoreCase));
             bool changed = command == "add"
-                ? AddOrUpdate(root, Path.GetFullPath(args[2]), appName)
+                ? AddOrUpdate(root, Path.GetFullPath(args[2]), appName, iconPath)
                 : Remove(root, appName);
 
             if (!changed)
@@ -88,7 +91,7 @@ internal static class HavenMoonVRSteamShortcutTool
         }
     }
 
-    private static bool AddOrUpdate(VdfNode root, string executable, string appName)
+    private static bool AddOrUpdate(VdfNode root, string executable, string appName, string iconPath)
     {
         List<VdfNode> matches = root.Children.Where(n => String.Equals(GetString(n, "AppName"), appName, StringComparison.OrdinalIgnoreCase)).ToList();
         VdfNode entry;
@@ -111,7 +114,7 @@ internal static class HavenMoonVRSteamShortcutTool
         SetString(entry, "AppName", appName);
         SetString(entry, "Exe", quotedExe);
         SetString(entry, "StartDir", quotedStart);
-        SetString(entry, "icon", executable);
+        SetString(entry, "icon", String.IsNullOrEmpty(iconPath) ? executable : iconPath);
         SetString(entry, "ShortcutPath", String.Empty);
         SetString(entry, "LaunchOptions", String.Empty);
         SetInt(entry, "IsHidden", 0);
