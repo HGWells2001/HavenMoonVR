@@ -4,7 +4,7 @@ Created by Massimo Giannelli using ChatGPT in Florence, Italy.
 
 ## Unreleased
 
-- Restored the ocean reflection skybox in levels 1-4. The previous dark-clear reflection setting could expose a black wedge between ocean and sky when the headset was rolled left or right.
+- Added a VR-safe ocean fallback: the experimental runtime disconnects the legacy planar-reflection pass, selects the low non-reflective Water4 shader and disables its screen-space edge blend. This removes the roll-dependent black horizon at the cost of simpler-looking water.
 - The installed launcher now embeds the icon from the user's local `HavenMoon.exe`, and Steam uses that original executable as the shortcut icon source. No original game artwork is redistributed.
 - The icon-enabled launcher remains AnyCPU and the starter explicitly selects 64-bit Windows PowerShell, preventing a 32-bit process from trying to load SteamVR's 64-bit `openvr_api.dll`.
 

@@ -16,7 +16,7 @@ $SupportedExeSha256 = 'd204db3128f654d052ee72c118604a183d1bcb32ff083edc3f038ac00
 
 $OriginalAssemblySha256 = '863be6215489f7cce586539cc5feb146587cf433dabf31bac326e1a366d164f5'
 $PatchedAssemblySha256  = '8c540e2a09199dc9ca7c4145e2fc98b3e1c4b626c2b810e67e21f946061bbe4b'
-$ExperimentalHelperSha256 = 'b1cd94dd6675365cf24ce5badd595ff6bd18c37843e10492208fbd59df5cc794'
+$ExperimentalHelperSha256 = '8c79a588fc28c13f875390d8ccd0afd231c744c8efbadfbab8e0686dc520ffc4'
 
 $OriginalHashes = @{
     'globalgamemanagers' = 'c3197fd383bdfb90d88883123ccc3dfd8410a2f7f24d186771b76edd626cd9bc'
@@ -612,7 +612,7 @@ function Install-Patch([string]$GameDir,[double]$Y) {
         'Experimental interaction: independent left/right tracked rays; left trigger/X=Fire2; right trigger/A=Fire1',
         'Eye height: original 0.683 m camera baseline with tracked-height compensation; F7/F9 adjust by 0.05 m; automatic per scene + Y/F8 reset',
         ('Launcher icon embedded locally from original HavenMoon.exe: '+$launcherIconEmbedded),
-        'Ocean reflection skybox: enabled (VR horizon-roll fix)',
+        'Ocean rendering: low Water4 shader, planar reflection and edge blend disabled (VR horizon-roll fix)',
         'FXAA profiles=ExtremeQuality'
     )|Set-Content -LiteralPath (Join-Path $backupDir 'HavenMoonVR_install_info.txt') -Encoding UTF8
     Write-Host ''

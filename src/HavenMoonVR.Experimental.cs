@@ -33,10 +33,13 @@ namespace HavenMoonVR
         private static bool previousLeftAction;
         private static bool previousRightAction;
         private static float desiredEyeHeight = -1.0f;
+        private static string waterFallbackScene = String.Empty;
+        private static UnityEngine.Object waterFallbackMarker;
 
         public static void Tick(Component controller)
         {
             HideFixedCrossHair();
+            ApplyVrSafeOceanFallback();
             UpdateHeightRecenter();
 
             Camera camera = Camera.main;
@@ -145,6 +148,98 @@ namespace HavenMoonVR
                 crossHair = GameObject.Find("UI_CrossHair");
             if (crossHair != null && crossHair.activeSelf)
                 crossHair.SetActive(false);
+        }
+
+        private static void ApplyVrSafeOceanFallback()
+        {
+            string scene = SceneManager.GetActiveScene().name;
+            if (scene == waterFallbackScene && waterFallbackMarker != null) return;
+
+            try
+            {
+                int tileCount = 0;
+                int waterCount = 0;
+                UnityEngine.Object sceneMarker = null;
+
+                Type tileType = FindLoadedType("UnityStandardAssets.Water.WaterTile");
+                if (tileType != null)
+                {
+                    FieldInfo reflectionField = tileType.GetField(
+                        "reflection",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    UnityEngine.Object[] tiles = UnityEngine.Object.FindObjectsOfType(tileType);
+                    if (tiles.Length > 0) sceneMarker = tiles[0];
+                    if (reflectionField != null)
+                    {
+                        for (int i = 0; i < tiles.Length; i++)
+                        {
+                            // WaterTile calls PlanarReflection directly even when that
+                            // component is disabled, so clear its cached reference.
+                            reflectionField.SetValue(tiles[i], null);
+                            tileCount++;
+                        }
+                    }
+                }
+
+                Type reflectionType = FindLoadedType("UnityStandardAssets.Water.PlanarReflection");
+                if (reflectionType != null)
+                {
+                    UnityEngine.Object[] reflections = UnityEngine.Object.FindObjectsOfType(reflectionType);
+                    for (int i = 0; i < reflections.Length; i++)
+                    {
+                        Behaviour behaviour = reflections[i] as Behaviour;
+                        if (behaviour != null) behaviour.enabled = false;
+                    }
+                }
+
+                Type waterBaseType = FindLoadedType("UnityStandardAssets.Water.WaterBase");
+                if (waterBaseType != null)
+                {
+                    FieldInfo qualityField = waterBaseType.GetField(
+                        "waterQuality",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    FieldInfo edgeBlendField = waterBaseType.GetField(
+                        "edgeBlend",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    MethodInfo updateShader = waterBaseType.GetMethod(
+                        "UpdateShader",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    UnityEngine.Object[] waterBases = UnityEngine.Object.FindObjectsOfType(waterBaseType);
+                    if (sceneMarker == null && waterBases.Length > 0) sceneMarker = waterBases[0];
+                    for (int i = 0; i < waterBases.Length; i++)
+                    {
+                        if (qualityField != null)
+                            qualityField.SetValue(waterBases[i], Enum.ToObject(qualityField.FieldType, 0));
+                        if (edgeBlendField != null)
+                            edgeBlendField.SetValue(waterBases[i], false);
+                        if (updateShader != null)
+                            updateShader.Invoke(waterBases[i], null);
+                        waterCount++;
+                    }
+                }
+
+                waterFallbackScene = scene;
+                waterFallbackMarker = sceneMarker != null ? sceneMarker : Camera.main;
+                if (tileCount > 0 || waterCount > 0)
+                    Debug.Log("HavenMoonVR VR-safe ocean fallback: planar reflection disabled, low water shader enabled.");
+            }
+            catch (Exception exception)
+            {
+                waterFallbackScene = scene;
+                waterFallbackMarker = Camera.main;
+                Debug.LogWarning("HavenMoonVR could not apply the VR-safe ocean fallback: " + exception.Message);
+            }
+        }
+
+        private static Type FindLoadedType(string fullName)
+        {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < assemblies.Length; i++)
+            {
+                Type type = assemblies[i].GetType(fullName, false);
+                if (type != null) return type;
+            }
+            return null;
         }
 
         private static bool ReadControllerBool(Component controller, string fieldName)

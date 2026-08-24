@@ -14,7 +14,7 @@ Unofficial PC VR prototype for Haven Moon, derived from the stable 1.0.2 line. T
 - A ray brightens and gains a surface dot when an interactable object is in range.
 - The left trigger activates the left-hand target; the right trigger activates the right-hand target.
 - The original centre-screen gameplay interaction ray is bypassed.
-- The ocean reflection keeps its skybox, avoiding the black horizon wedge seen when the headset is rolled left or right.
+- In VR the ocean uses the simplified Water4 shader without planar reflection or screen-space edge blending, avoiding the black horizon wedge seen during headset roll.
 
 Head-relative locomotion, right-stick turning, FXAA, VR Origin, automatic height recenter, Y/F8 recenter and SteamVR quality configuration remain available. Recenter now compensates Haven Moon's existing 0.683 m camera offset instead of counting it twice; F7/F9 adjust the result in persistent 5 cm steps.
 
