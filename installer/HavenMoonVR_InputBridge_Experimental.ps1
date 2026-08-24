@@ -770,7 +770,6 @@ try {
             $xMask=[uint64]1 -shl 7
             $xPressed=(($ls.pressed-band $xMask)-ne 0)
             $wantDecrement=(($ltv -gt 0.55) -or $xPressed)
-            $leftAction=$wantDecrement
 
             if((-not $decrementHeld) -and $wantDecrement){
                 [InputOut]::Key(0x51,$true)   # Q down -> Fire2
@@ -785,6 +784,10 @@ try {
                 $decrementHeld=$false
             }
         }
+        # Publish the same hysteresis-latched state as the virtual Fire2 key.
+        # Using the raw >0.55 threshold here used to end pointer activation
+        # before Q was actually released at <0.35, losing GetButtonUp actions.
+        $leftAction=$decrementHeld
 
         $tv=0.0
         if($rok){
@@ -803,7 +806,6 @@ try {
             $aMask=[uint64]1 -shl 7
             $aPressed=(($rs.pressed-band $aMask)-ne 0)
             $wantInteract=(($tv -gt 0.55) -or $aPressed)
-            $rightAction=$wantInteract
 
             if((-not $triggerHeld) -and $wantInteract){
                 [InputOut]::Key(0x45,$true)   # E down
@@ -818,6 +820,10 @@ try {
                 $triggerHeld=$false
             }
         }
+        # Keep the shared action bit synchronized with the virtual Fire1 key's
+        # hysteresis latch. This guarantees the target is still driven on the
+        # frame in which E is released and Unity reports GetButtonUp("Fire1").
+        $rightAction=$triggerHeld
 
         # Height recenter button:
         # On Oculus/Meta Touch legacy OpenVR state the secondary left face button

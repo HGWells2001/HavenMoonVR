@@ -19,6 +19,8 @@ namespace HavenMoonVR
         private const float OriginalCameraHeight = 0.683f;
         private const float DefaultEyeHeight = OriginalCameraHeight;
         private const float HeightStep = 0.05f;
+        private const float RecentTargetGraceSeconds = 0.18f;
+        private const int ReleaseGraceFrames = 3;
         private const string EyeHeightPreference = "HavenMoonVR_ExperimentalEyeHeight";
 
         private static readonly SharedPoseReader Shared = new SharedPoseReader();
@@ -32,6 +34,12 @@ namespace HavenMoonVR
         private static int recenterFramesRemaining;
         private static bool previousLeftAction;
         private static bool previousRightAction;
+        private static GameObject recentLeftTarget;
+        private static GameObject recentRightTarget;
+        private static float recentLeftTargetTime;
+        private static float recentRightTargetTime;
+        private static int leftReleaseGraceFrames;
+        private static int rightReleaseGraceFrames;
         private static float desiredEyeHeight = -1.0f;
         private static string waterFallbackScene = String.Empty;
         private static UnityEngine.Object waterFallbackMarker;
@@ -47,6 +55,7 @@ namespace HavenMoonVR
             {
                 LeftVisual.Hide();
                 RightVisual.Hide();
+                ResetInteractionMemory();
                 PreserveControllerInteractionState(controller, false);
                 return;
             }
@@ -58,8 +67,7 @@ namespace HavenMoonVR
             {
                 LeftVisual.Hide();
                 RightVisual.Hide();
-                previousLeftAction = false;
-                previousRightAction = false;
+                ResetInteractionMemory();
                 PreserveControllerInteractionState(controller, false);
                 SetKeyUi("none");
                 return;
@@ -89,13 +97,72 @@ namespace HavenMoonVR
             PreserveControllerInteractionState(controller, leftTarget != null || rightTarget != null);
             UpdateKeyUi(leftTarget, rightTarget, state.LeftAction, state.RightAction);
 
-            if (leftTarget != null && (state.LeftAction || previousLeftAction))
-                leftTarget.SendMessage("Activate");
-            if (rightTarget != null && (state.RightAction || previousRightAction))
-                rightTarget.SendMessage("Activate");
+            UpdateActivation(
+                leftTarget,
+                state.LeftAction,
+                ref previousLeftAction,
+                ref recentLeftTarget,
+                ref recentLeftTargetTime,
+                ref leftReleaseGraceFrames);
+            UpdateActivation(
+                rightTarget,
+                state.RightAction,
+                ref previousRightAction,
+                ref recentRightTarget,
+                ref recentRightTargetTime,
+                ref rightReleaseGraceFrames);
+        }
 
-            previousLeftAction = state.LeftAction;
-            previousRightAction = state.RightAction;
+        private static void UpdateActivation(
+            GameObject target,
+            bool action,
+            ref bool previousAction,
+            ref GameObject recentTarget,
+            ref float recentTargetTime,
+            ref int releaseGraceFrames)
+        {
+            float now = Time.realtimeSinceStartup;
+            if (target != null)
+            {
+                recentTarget = target;
+                recentTargetTime = now;
+            }
+
+            if (previousAction && !action)
+                releaseGraceFrames = ReleaseGraceFrames;
+            else if (action)
+                releaseGraceFrames = 0;
+
+            bool releaseGrace = releaseGraceFrames > 0;
+            if (releaseGraceFrames > 0) releaseGraceFrames--;
+
+            GameObject activationTarget = target;
+            if (activationTarget == null &&
+                recentTarget != null &&
+                now - recentTargetTime <= RecentTargetGraceSeconds)
+                activationTarget = recentTarget;
+
+            if (activationTarget != null && (action || releaseGrace))
+                activationTarget.SendMessage("Activate");
+
+            previousAction = action;
+            if (!action &&
+                releaseGraceFrames == 0 &&
+                recentTarget != null &&
+                now - recentTargetTime > RecentTargetGraceSeconds)
+                recentTarget = null;
+        }
+
+        private static void ResetInteractionMemory()
+        {
+            previousLeftAction = false;
+            previousRightAction = false;
+            recentLeftTarget = null;
+            recentRightTarget = null;
+            recentLeftTargetTime = 0.0f;
+            recentRightTargetTime = 0.0f;
+            leftReleaseGraceFrames = 0;
+            rightReleaseGraceFrames = 0;
         }
 
         private static GameObject ResolvePointer(

@@ -4,6 +4,8 @@ Created by Massimo Giannelli using ChatGPT in Florence, Italy.
 
 ## Unreleased
 
+- Synchronized each shared controller-action flag with the same hysteresis latch used by its virtual Fire1/Fire2 key. The target no longer stops receiving activation before Unity sees the key release.
+- Added a three-frame release allowance and a 0.18-second recent-target memory per hand, preventing short trigger-induced aim movement or input timing from dropping a click.
 - Added a VR-safe ocean fallback: the experimental runtime disconnects the legacy planar-reflection pass, selects the low non-reflective Water4 shader and disables its screen-space edge blend. This removes the roll-dependent black horizon at the cost of simpler-looking water.
 - The installed launcher now embeds the icon from the user's local `HavenMoon.exe`, and Steam uses that original executable as the shortcut icon source. No original game artwork is redistributed.
 - The icon-enabled launcher remains AnyCPU and the starter explicitly selects 64-bit Windows PowerShell, preventing a 32-bit process from trying to load SteamVR's 64-bit `openvr_api.dll`.

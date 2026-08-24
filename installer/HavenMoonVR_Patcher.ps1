@@ -16,7 +16,7 @@ $SupportedExeSha256 = 'd204db3128f654d052ee72c118604a183d1bcb32ff083edc3f038ac00
 
 $OriginalAssemblySha256 = '863be6215489f7cce586539cc5feb146587cf433dabf31bac326e1a366d164f5'
 $PatchedAssemblySha256  = '8c540e2a09199dc9ca7c4145e2fc98b3e1c4b626c2b810e67e21f946061bbe4b'
-$ExperimentalHelperSha256 = '8c79a588fc28c13f875390d8ccd0afd231c744c8efbadfbab8e0686dc520ffc4'
+$ExperimentalHelperSha256 = '8d0b8781d6daff157788c9e2c7144becd43b52bf8d3f734f47445c0c5a83955d'
 
 $OriginalHashes = @{
     'globalgamemanagers' = 'c3197fd383bdfb90d88883123ccc3dfd8410a2f7f24d186771b76edd626cd9bc'

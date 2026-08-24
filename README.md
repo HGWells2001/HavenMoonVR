@@ -13,6 +13,7 @@ Unofficial PC VR prototype for Haven Moon, derived from the stable 1.0.2 line. T
 - Thin blue-left and orange-right rays remain visible while the controllers are tracked.
 - A ray brightens and gains a surface dot when an interactable object is in range.
 - The left trigger activates the left-hand target; the right trigger activates the right-hand target.
+- Trigger release uses the same hysteresis-latched state as Fire1/Fire2 plus a short allowance so activation is not dropped.
 - The original centre-screen gameplay interaction ray is bypassed.
 - In VR the ocean uses the simplified Water4 shader without planar reflection or screen-space edge blending, avoiding the black horizon wedge seen during headset roll.
 

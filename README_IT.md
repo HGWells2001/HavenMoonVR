@@ -13,6 +13,7 @@ Prototipo PC VR non ufficiale per Haven Moon, derivato dalla linea stabile 1.0.2
 - Due raggi sottili restano visibili quando i controller sono tracciati: azzurro a sinistra e arancione a destra.
 - Il raggio si illumina e mostra un punto sulla superficie quando l'oggetto è realmente interagibile e abbastanza vicino.
 - Il trigger sinistro attiva il bersaglio sinistro; il trigger destro attiva il bersaglio destro.
+- Il rilascio dei trigger usa lo stesso stato con isteresi dei tasti Fire1/Fire2 e una breve tolleranza per non perdere l'attivazione.
 - Il vecchio raycast fisso al centro viene bypassato durante l'interazione di gioco.
 - L'oceano usa in VR lo shader Water4 semplificato senza riflessione planare né fusione screen-space, evitando il cuneo nero all'orizzonte quando si inclina la testa.
 
