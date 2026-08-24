@@ -276,7 +276,7 @@ function Install-LauncherWithLocalGameIcon([string]$GameDir) {
         $writer.Dispose();$writer=$null;$stream.Dispose();$stream=$null
 
         $compilerArgs=@(
-            '/nologo','/target:winexe','/platform:x86','/optimize+',
+            '/nologo','/target:winexe','/platform:anycpu','/optimize+',
             '/reference:System.Windows.Forms.dll',
             ('/win32icon:'+$icoPath),('/out:'+$builtLauncher),$launcherSource
         )

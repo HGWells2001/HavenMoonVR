@@ -505,8 +505,14 @@ if(-not $NoLaunch){
 }
 
 $dll = Resolve-SteamVR64
-if ([K32]::LoadLibrary($dll) -eq [IntPtr]::Zero) {
-    throw "Cannot load SteamVR OpenVR DLL: $dll"
+if([IntPtr]::Size-ne 8){
+    throw 'The OpenVR bridge requires 64-bit PowerShell. Reinstall the Steam Icon hotfix or start it with 64-bit Windows PowerShell.'
+}
+Write-Host 'OpenVR bridge process: 64-bit PowerShell.' -ForegroundColor DarkGray
+$openVrModule=[K32]::LoadLibrary($dll)
+if ($openVrModule -eq [IntPtr]::Zero) {
+    $loadError=[Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    throw "Cannot load SteamVR OpenVR DLL: $dll (Windows error $loadError)"
 }
 
 # Wait for the runtime to report an HMD. This is particularly useful with

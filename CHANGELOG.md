@@ -5,6 +5,7 @@ Created by Massimo Giannelli using ChatGPT in Florence, Italy.
 ## Unreleased
 
 - The installed launcher now embeds the icon from the user's local `HavenMoon.exe`, and Steam uses that original executable as the shortcut icon source. No original game artwork is redistributed.
+- The icon-enabled launcher remains AnyCPU and the starter explicitly selects 64-bit Windows PowerShell, preventing a 32-bit process from trying to load SteamVR's 64-bit `openvr_api.dll`.
 
 ## 1.1.1 hotfix
 
