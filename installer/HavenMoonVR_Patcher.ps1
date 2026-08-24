@@ -33,10 +33,10 @@ $OriginalHashes = @{
 $DefaultFinalHashes = @{
     'globalgamemanagers' = '33623c39b8d61d1206ec3bc33df5c4f8f19e38a206f503c62c6b1e2e9874a22a'
     'level0' = '05a8c5076bff43655657e968d5ac2ffbcca38c458a4e493931f70045e074a751'
-    'level1' = '691533ba3fd731d9ecab2f15c9244077e3b10308a3213f6c0907fee290decd21'
-    'level2' = '41de557351029b8faf6a0274d30618394b7a01ab0a92a1b14b611a235252275d'
-    'level3' = '8fbb2d859849e8e2872946e9c2037670bedfe11f76022b81dc3196b156cd0d28'
-    'level4' = 'd15de01eadeed103d36055aaa5e8fc6d1b426e1a64e27b85f28609cab969f1b4'
+    'level1' = 'ee63a273483432e5f59fbff81ec27e1734647aa058a65d897443719ddd6139ac'
+    'level2' = '9f64697fe3ac04fa0748bf811b4f58bf011e3f3d3acab2a9733d1c31b0264ec2'
+    'level3' = '329cfdd9f32eb14b50fc526053b6a2ddaa3544619821ac0a04694048461972ce'
+    'level4' = 'c564decd0c4e5097ecd8023eb91b9500d39a0c4aa0a0f7a95a4ba57dd36f6193'
     'level5' = 'fbf5a05222f8bc5cbb9896edad7a60390be5306735f908379e12fc64dcffa2c5'
     'level6' = 'eb4342a179f6cd8fe7e2ef6183cbfb39a0950f2c1c5abce89a4d8f0f74d1c4ce'
     'sharedassets1.assets' = 'bd4393b224032d8b864720e81e90c48b32322560d4cdc19060754fbf6ae4e1a2'
@@ -51,30 +51,22 @@ $LevelPatches = @{
     'level1' = @(
         @{ Offset = 14759720; Bytes = [byte[]](1) },
         @{ Offset = 14759728; Bytes = [byte[]](18,3) },
-        @{ Offset = 14759736; Bytes = [byte[]](51,51,179,62) },
-        @{ Offset = 14770996; Bytes = [byte[]](0) },
-        @{ Offset = 14771000; Bytes = [byte[]](143,194,245,61,236,81,56,62,143,194,117,62,0,0,128,63) }
+        @{ Offset = 14759736; Bytes = [byte[]](51,51,179,62) }
     )
     'level2' = @(
         @{ Offset = 4291168; Bytes = [byte[]](1) },
         @{ Offset = 4291176; Bytes = [byte[]](198,4) },
-        @{ Offset = 4291184; Bytes = [byte[]](51,51,179,62) },
-        @{ Offset = 4308508; Bytes = [byte[]](0) },
-        @{ Offset = 4308512; Bytes = [byte[]](143,194,245,61,236,81,56,62,143,194,117,62,0,0,128,63) }
+        @{ Offset = 4291184; Bytes = [byte[]](51,51,179,62) }
     )
     'level3' = @(
         @{ Offset = 22539880; Bytes = [byte[]](1) },
         @{ Offset = 22539888; Bytes = [byte[]](118,3) },
-        @{ Offset = 22539896; Bytes = [byte[]](51,51,179,62) },
-        @{ Offset = 22551060; Bytes = [byte[]](0) },
-        @{ Offset = 22551064; Bytes = [byte[]](143,194,245,61,236,81,56,62,143,194,117,62,0,0,128,63) }
+        @{ Offset = 22539896; Bytes = [byte[]](51,51,179,62) }
     )
     'level4' = @(
         @{ Offset = 21594856; Bytes = [byte[]](1) },
         @{ Offset = 21594864; Bytes = [byte[]](141,3) },
-        @{ Offset = 21594872; Bytes = [byte[]](51,51,179,62) },
-        @{ Offset = 21605020; Bytes = [byte[]](0) },
-        @{ Offset = 21605024; Bytes = [byte[]](143,194,245,61,236,81,56,62,143,194,117,62,0,0,128,63) }
+        @{ Offset = 21594872; Bytes = [byte[]](51,51,179,62) }
     )
     'level5' = @(
         @{ Offset = 18733048; Bytes = [byte[]](1) },
@@ -620,6 +612,7 @@ function Install-Patch([string]$GameDir,[double]$Y) {
         'Experimental interaction: independent left/right tracked rays; left trigger/X=Fire2; right trigger/A=Fire1',
         'Eye height: original 0.683 m camera baseline with tracked-height compensation; F7/F9 adjust by 0.05 m; automatic per scene + Y/F8 reset',
         ('Launcher icon embedded locally from original HavenMoon.exe: '+$launcherIconEmbedded),
+        'Ocean reflection skybox: enabled (VR horizon-roll fix)',
         'FXAA profiles=ExtremeQuality'
     )|Set-Content -LiteralPath (Join-Path $backupDir 'HavenMoonVR_install_info.txt') -Encoding UTF8
     Write-Host ''
@@ -647,7 +640,7 @@ function Verify-Patch([string]$GameDir) {
         $h=Get-FileSha256 $p
         if($h-eq $OriginalHashes[$name]){Write-Host "$name : ORIGINAL" -ForegroundColor Yellow}
         elseif($name-eq 'sharedassets1.assets' -and $DefaultFinalHashes.ContainsKey($name)-and $h-eq $DefaultFinalHashes[$name]){Write-Host "$name : FXAA EXTREME QUALITY (Normal + Light)" -ForegroundColor Green}
-        elseif($DefaultFinalHashes.ContainsKey($name)-and $h-eq $DefaultFinalHashes[$name]){Write-Host "$name : HavenMoonVR default (height -1.00 m, UI 0.35 m, VR Comfort Water)" -ForegroundColor Green}
+        elseif($DefaultFinalHashes.ContainsKey($name)-and $h-eq $DefaultFinalHashes[$name]){Write-Host "$name : HavenMoonVR default (height -1.00 m, UI 0.35 m, VR-safe ocean horizon)" -ForegroundColor Green}
         elseif($name-like 'level[1-6]'){Write-Host "$name : PATCHED/CUSTOM HEIGHT (SHA $h)" -ForegroundColor Cyan}
         else{Write-Host "$name : MODIFIED/UNKNOWN (SHA $h)" -ForegroundColor Red}
     }

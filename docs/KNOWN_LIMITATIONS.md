@@ -7,6 +7,7 @@
 - The game must be launched through `Haven Moon VR Experimental`. The older stable shortcut does not publish controller poses, so the centre reticle will disappear but no controller rays can appear.
 - The stable and experimental game patches cannot be active at the same time in one Haven Moon installation.
 - Rays remain dim when a target is out of range, not tagged as activable, blocked by another collider, or while the player is moving; only a valid target makes its ray bright and displays the hit dot.
+- The experimental horizon fix restores the original skybox in the ocean's planar reflection to avoid exposing a dark clear-color wedge during headset roll. This may make the water reflection brighter than the earlier comfort-water setting.
 - The build has been structurally verified without modifying the installed game, but final comfort, aim alignment and per-object behavior require an in-headset play test.
 
 For useful feedback, record the headset/controller model, SteamVR runtime path, hand used, object targeted, whether the ray appeared, and whether the expected direction/action occurred.

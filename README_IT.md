@@ -14,6 +14,7 @@ Prototipo PC VR non ufficiale per Haven Moon, derivato dalla linea stabile 1.0.2
 - Il raggio si illumina e mostra un punto sulla superficie quando l'oggetto è realmente interagibile e abbastanza vicino.
 - Il trigger sinistro attiva il bersaglio sinistro; il trigger destro attiva il bersaglio destro.
 - Il vecchio raycast fisso al centro viene bypassato durante l'interazione di gioco.
+- La riflessione dell'oceano mantiene il cielo, evitando il cuneo nero all'orizzonte quando si inclina la testa a destra o sinistra.
 
 Locomozione relativa alla testa, rotazione con stick destro, FXAA, VR Origin, reset automatico dell'altezza, Y/F8 e configurazione della qualità SteamVR restano disponibili. Il reset ora compensa correttamente l'offset di 0,683 m già presente nella camera originale, evitando di sommarlo due volte. F7 e F9 permettono di rifinire l'altezza e la scelta viene memorizzata.
 
