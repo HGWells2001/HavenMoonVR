@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+
+# Local game/runtime dependencies — never commit
+UnityEngine*.dll
+Assembly-CSharp.dll
+openvr_api.dll
+HavenMoon.exe
+HavenMoon_Data/
+HavenMoonVR_Backup/
+
+# Local test material
+*.bak
+*.tmp
+shortcuts.vdf
