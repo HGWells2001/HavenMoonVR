@@ -1,11 +1,8 @@
-name: Repair experimental release package
+name: Repair experimental release package (manual)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/HavenMoonVR.ExperimentalLauncher.cs'
-      - '.github/workflows/repair-experimental-release.yml'
+  # This job replaces public release assets. Keep it manual so a normal
+  # source push cannot silently overwrite a tested package and checksum.
   workflow_dispatch:
 
 permissions:
