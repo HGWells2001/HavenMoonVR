@@ -5,11 +5,11 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.VR;
 
-[assembly: AssemblyVersion("1.1.1.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
 
 namespace HavenMoonVR
 {
-    public static class ExperimentalPointers
+    public static class CommunityPatch
     {
         private const float InteractionRayLength = 4.0f;
         private const float InteractionDistance = 1.8f;
@@ -21,7 +21,7 @@ namespace HavenMoonVR
         private const float HeightStep = 0.05f;
         private const float RecentTargetGraceSeconds = 0.18f;
         private const int ReleaseGraceFrames = 3;
-        private const string EyeHeightPreference = "HavenMoonVR_ExperimentalEyeHeight";
+        private const string EyeHeightPreference = "HavenMoonVR_EyeHeight";
 
         private static readonly SharedPoseReader Shared = new SharedPoseReader();
         private static readonly PointerVisual LeftVisual = new PointerVisual("HavenMoonVR Left Pointer", new Color(0.15f, 0.75f, 1.0f, 1.0f));
@@ -43,6 +43,45 @@ namespace HavenMoonVR
         private static float desiredEyeHeight = -1.0f;
         private static string waterFallbackScene = String.Empty;
         private static UnityEngine.Object waterFallbackMarker;
+
+        // Haven Moon's original FixedUpdate calls CharacterController.Move twice
+        // with the same vector. The patcher redirects the first call here and the
+        // second to MoveOnceCenteredOnHead. Returning without moving removes the
+        // duplicate while the second helper preserves the original total speed.
+        public static CollisionFlags SuppressDuplicateMove(CharacterController controller, Vector3 motion)
+        {
+            return (CollisionFlags)0;
+        }
+
+        // Preserve the distance of the original two Move calls in one continuous
+        // sweep. Unity's native VR tracking offsets the child camera horizontally
+        // but does not move the parent CharacterController capsule. Keeping the
+        // capsule below the tracked head makes visible railing clearance symmetric.
+        public static CollisionFlags MoveOnceCenteredOnHead(CharacterController controller, Vector3 motion)
+        {
+            if (controller == null) return (CollisionFlags)0;
+
+            Camera camera = Camera.main;
+            if (camera != null)
+            {
+                Transform playerTransform = controller.transform;
+                Transform cameraTransform = camera.transform;
+                if (cameraTransform == playerTransform || cameraTransform.IsChildOf(playerTransform))
+                {
+                    Vector3 headLocal = playerTransform.InverseTransformPoint(cameraTransform.position);
+                    Vector3 center = controller.center;
+                    if (Mathf.Abs(center.x - headLocal.x) > 0.0001f ||
+                        Mathf.Abs(center.z - headLocal.z) > 0.0001f)
+                    {
+                        center.x = headLocal.x;
+                        center.z = headLocal.z;
+                        controller.center = center;
+                    }
+                }
+            }
+
+            return controller.Move(motion * 2.0f);
+        }
 
         public static void Tick(Component controller)
         {
@@ -224,9 +263,40 @@ namespace HavenMoonVR
 
             try
             {
+                int fogCount = 0;
                 int tileCount = 0;
                 int waterCount = 0;
                 UnityEngine.Object sceneMarker = null;
+
+                // Haven Moon attaches both GlobalFog and GlobalFogWATER to the
+                // player camera. Their legacy full-screen blits reconstruct one
+                // symmetric desktop frustum from Camera.fieldOfView/aspect. In
+                // stereo VR each eye has an asymmetric projection, so rolling
+                // the HMD exposes an unrendered black wedge at the horizon.
+                // Keep Unity's native scene fog, but remove these two incompatible
+                // post-processing passes from the community VR runtime.
+                string[] legacyFogTypes = new string[]
+                {
+                    "UnityStandardAssets.ImageEffects.GlobalFog",
+                    "UnityStandardAssets.ImageEffects.GlobalFogWATER"
+                };
+                for (int fogTypeIndex = 0; fogTypeIndex < legacyFogTypes.Length; fogTypeIndex++)
+                {
+                    Type fogType = FindLoadedType(legacyFogTypes[fogTypeIndex]);
+                    if (fogType == null) continue;
+
+                    UnityEngine.Object[] fogEffects = UnityEngine.Object.FindObjectsOfType(fogType);
+                    if (sceneMarker == null && fogEffects.Length > 0) sceneMarker = fogEffects[0];
+                    for (int i = 0; i < fogEffects.Length; i++)
+                    {
+                        Behaviour behaviour = fogEffects[i] as Behaviour;
+                        if (behaviour != null && behaviour.enabled)
+                        {
+                            behaviour.enabled = false;
+                            fogCount++;
+                        }
+                    }
+                }
 
                 Type tileType = FindLoadedType("UnityStandardAssets.Water.WaterTile");
                 if (tileType != null)
@@ -276,7 +346,9 @@ namespace HavenMoonVR
                     for (int i = 0; i < waterBases.Length; i++)
                     {
                         if (qualityField != null)
-                            qualityField.SetValue(waterBases[i], Enum.ToObject(qualityField.FieldType, 0));
+                            // Water4 Medium unlocks its improved 300-LOD pass without
+                            // the 500-LOD screen GrabPass, which is unsafe in legacy VR.
+                            qualityField.SetValue(waterBases[i], Enum.ToObject(qualityField.FieldType, 1));
                         if (edgeBlendField != null)
                             edgeBlendField.SetValue(waterBases[i], false);
                         if (updateShader != null)
@@ -285,10 +357,14 @@ namespace HavenMoonVR
                     }
                 }
 
+                int cinematicProfiles = ApplyCinematicRenderingProfile();
                 waterFallbackScene = scene;
                 waterFallbackMarker = sceneMarker != null ? sceneMarker : Camera.main;
-                if (tileCount > 0 || waterCount > 0)
-                    Debug.Log("HavenMoonVR VR-safe ocean fallback: planar reflection disabled, low water shader enabled.");
+                if (fogCount > 0 || tileCount > 0 || waterCount > 0)
+                    Debug.Log(
+                        "HavenMoonVR VR-safe horizon fallback: " + fogCount +
+                        " legacy fog pass(es) disabled; planar reflection disabled; stereo-safe Water4 300-LOD shader enabled; " +
+                        cinematicProfiles + " cinematic post-processing profile(s) configured.");
             }
             catch (Exception exception)
             {
@@ -296,6 +372,238 @@ namespace HavenMoonVR
                 waterFallbackMarker = Camera.main;
                 Debug.LogWarning("HavenMoonVR could not apply the VR-safe ocean fallback: " + exception.Message);
             }
+        }
+
+        private static int ApplyCinematicRenderingProfile()
+        {
+            // This intentionally prioritises image quality over GPU cost. All
+            // changes operate on normal scene rendering or per-eye-safe colour
+            // effects; the legacy fog and planar-reflection passes remain off.
+            Shader.globalMaximumLOD = 1000;
+            QualitySettings.masterTextureLimit = 0;
+            QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
+            QualitySettings.lodBias = 4.0f;
+            QualitySettings.maximumLODLevel = 0;
+            QualitySettings.pixelLightCount = 32;
+            QualitySettings.shadowResolution = ShadowResolution.VeryHigh;
+            QualitySettings.shadowProjection = ShadowProjection.StableFit;
+            QualitySettings.shadowCascades = 4;
+            QualitySettings.shadowDistance = 250.0f;
+            QualitySettings.realtimeReflectionProbes = true;
+            QualitySettings.antiAliasing = 8;
+
+            UnityEngine.Object[] shaders = Resources.FindObjectsOfTypeAll(typeof(Shader));
+            for (int i = 0; i < shaders.Length; i++)
+            {
+                Shader shader = shaders[i] as Shader;
+                if (shader != null)
+                    shader.maximumLOD = shader.name == "FX/Water4" ? 301 : 1000;
+            }
+
+            UnityEngine.Object[] textures = Resources.FindObjectsOfTypeAll(typeof(Texture2D));
+            for (int i = 0; i < textures.Length; i++)
+            {
+                Texture2D texture = textures[i] as Texture2D;
+                if (texture == null) continue;
+                texture.anisoLevel = 16;
+                texture.filterMode = FilterMode.Trilinear;
+                texture.mipMapBias = -0.35f;
+            }
+
+            UnityEngine.Object[] cameras = UnityEngine.Object.FindObjectsOfType(typeof(Camera));
+            for (int i = 0; i < cameras.Length; i++)
+            {
+                Camera camera = cameras[i] as Camera;
+                if (camera == null) continue;
+                camera.hdr = true;
+                camera.depthTextureMode |= DepthTextureMode.DepthNormals;
+            }
+
+            UnityEngine.Object[] terrains = UnityEngine.Object.FindObjectsOfType(typeof(Terrain));
+            for (int i = 0; i < terrains.Length; i++)
+            {
+                Terrain terrain = terrains[i] as Terrain;
+                if (terrain == null) continue;
+                terrain.heightmapPixelError = 1.0f;
+                terrain.basemapDistance = 10000.0f;
+                terrain.detailObjectDensity = 1.0f;
+                terrain.detailObjectDistance = 300.0f;
+                terrain.treeDistance = 5000.0f;
+                terrain.treeBillboardDistance = 1000.0f;
+                terrain.treeCrossFadeLength = 200.0f;
+                terrain.treeMaximumFullLODCount = 500;
+            }
+
+            UnityEngine.Object[] lights = UnityEngine.Object.FindObjectsOfType(typeof(Light));
+            for (int i = 0; i < lights.Length; i++)
+            {
+                Light light = lights[i] as Light;
+                if (light != null && light.shadows != LightShadows.None)
+                    light.shadowResolution = LightShadowResolution.VeryHigh;
+            }
+
+            return ConfigureCinematicPostProcessing();
+        }
+
+        private static int ConfigureCinematicPostProcessing()
+        {
+            Type behaviourType = FindLoadedType("UnityEngine.PostProcessing.PostProcessingBehaviour");
+            Type profileType = FindLoadedType("UnityEngine.PostProcessing.PostProcessingProfile");
+            if (behaviourType == null || profileType == null) return 0;
+
+            UnityEngine.Object[] profiles = Resources.FindObjectsOfTypeAll(profileType);
+            UnityEngine.Object normalProfile = null;
+            for (int i = 0; i < profiles.Length; i++)
+            {
+                if (profiles[i] != null && profiles[i].name == "HM_PostProcessings_Normal")
+                {
+                    normalProfile = profiles[i];
+                    break;
+                }
+            }
+            if (normalProfile == null) return 0;
+
+            ConfigureAmbientOcclusion(normalProfile);
+            ConfigureBloom(normalProfile);
+            ConfigureColorGrading(normalProfile);
+            SetPostProcessingModelEnabled(normalProfile, "screenSpaceReflection", false);
+            SetPostProcessingModelEnabled(normalProfile, "depthOfField", false);
+            SetPostProcessingModelEnabled(normalProfile, "motionBlur", false);
+            SetPostProcessingModelEnabled(normalProfile, "eyeAdaptation", false);
+            SetPostProcessingModelEnabled(normalProfile, "chromaticAberration", false);
+            SetPostProcessingModelEnabled(normalProfile, "grain", false);
+            SetPostProcessingModelEnabled(normalProfile, "vignette", false);
+
+            FieldInfo profileField = FindInstanceField(behaviourType, "profile");
+            if (profileField == null) return 0;
+
+            int configured = 0;
+            UnityEngine.Object[] behaviours = UnityEngine.Object.FindObjectsOfType(behaviourType);
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                if (behaviours[i] == null) continue;
+                profileField.SetValue(behaviours[i], normalProfile);
+                Behaviour behaviour = behaviours[i] as Behaviour;
+                if (behaviour != null) behaviour.enabled = true;
+                configured++;
+            }
+            return configured;
+        }
+
+        private static void ConfigureAmbientOcclusion(object profile)
+        {
+            object model = GetPostProcessingModel(profile, "ambientOcclusion");
+            if (model == null) return;
+            SetModelEnabled(model, true);
+
+            FieldInfo settingsField = FindInstanceField(model.GetType(), "m_Settings");
+            if (settingsField == null) return;
+            object settings = settingsField.GetValue(model);
+            SetValue(settings, "intensity", 2.0f);
+            SetValue(settings, "radius", 0.45f);
+            SetValue(settings, "sampleCount", 3);
+            SetValue(settings, "downsampling", false);
+            SetValue(settings, "ambientOnly", false);
+            SetValue(settings, "highPrecision", true);
+            settingsField.SetValue(model, settings);
+        }
+
+        private static void ConfigureBloom(object profile)
+        {
+            object model = GetPostProcessingModel(profile, "bloom");
+            if (model == null) return;
+            SetModelEnabled(model, true);
+
+            FieldInfo settingsField = FindInstanceField(model.GetType(), "m_Settings");
+            if (settingsField == null) return;
+            object settings = settingsField.GetValue(model);
+            FieldInfo bloomField = FindInstanceField(settings.GetType(), "bloom");
+            if (bloomField == null) return;
+            object bloom = bloomField.GetValue(settings);
+            SetValue(bloom, "intensity", 0.8f);
+            SetValue(bloom, "threshold", 1.05f);
+            SetValue(bloom, "softKnee", 0.75f);
+            SetValue(bloom, "radius", 7.0f);
+            SetValue(bloom, "antiFlicker", true);
+            bloomField.SetValue(settings, bloom);
+            settingsField.SetValue(model, settings);
+        }
+
+        private static void ConfigureColorGrading(object profile)
+        {
+            object model = GetPostProcessingModel(profile, "colorGrading");
+            if (model == null) return;
+            SetModelEnabled(model, true);
+
+            FieldInfo settingsField = FindInstanceField(model.GetType(), "m_Settings");
+            if (settingsField == null) return;
+            object settings = settingsField.GetValue(model);
+
+            FieldInfo tonemappingField = FindInstanceField(settings.GetType(), "tonemapping");
+            if (tonemappingField != null)
+            {
+                object tonemapping = tonemappingField.GetValue(settings);
+                SetValue(tonemapping, "tonemapper", 1); // ACES
+                tonemappingField.SetValue(settings, tonemapping);
+            }
+
+            FieldInfo basicField = FindInstanceField(settings.GetType(), "basic");
+            if (basicField != null)
+            {
+                object basic = basicField.GetValue(settings);
+                SetValue(basic, "postExposure", 0.10f);
+                SetValue(basic, "saturation", 1.08f);
+                SetValue(basic, "contrast", 1.12f);
+                basicField.SetValue(settings, basic);
+            }
+
+            settingsField.SetValue(model, settings);
+            PropertyInfo dirtyProperty = model.GetType().GetProperty(
+                "isDirty", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (dirtyProperty != null && dirtyProperty.CanWrite)
+                dirtyProperty.SetValue(model, true, null);
+        }
+
+        private static object GetPostProcessingModel(object profile, string fieldName)
+        {
+            if (profile == null) return null;
+            FieldInfo field = FindInstanceField(profile.GetType(), fieldName);
+            return field != null ? field.GetValue(profile) : null;
+        }
+
+        private static void SetPostProcessingModelEnabled(object profile, string fieldName, bool enabled)
+        {
+            object model = GetPostProcessingModel(profile, fieldName);
+            if (model != null) SetModelEnabled(model, enabled);
+        }
+
+        private static void SetModelEnabled(object model, bool enabled)
+        {
+            FieldInfo enabledField = FindInstanceField(model.GetType(), "m_Enabled");
+            if (enabledField != null) enabledField.SetValue(model, enabled);
+        }
+
+        private static void SetValue(object target, string fieldName, object value)
+        {
+            if (target == null) return;
+            FieldInfo field = FindInstanceField(target.GetType(), fieldName);
+            if (field == null) return;
+            if (field.FieldType.IsEnum)
+                field.SetValue(target, Enum.ToObject(field.FieldType, Convert.ToInt32(value)));
+            else
+                field.SetValue(target, value);
+        }
+
+        private static FieldInfo FindInstanceField(Type type, string name)
+        {
+            while (type != null)
+            {
+                FieldInfo field = type.GetField(
+                    name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (field != null) return field;
+                type = type.BaseType;
+            }
+            return null;
         }
 
         private static Type FindLoadedType(string fullName)
@@ -408,7 +716,7 @@ namespace HavenMoonVR
                 PlayerPrefs.Save();
                 TryRecenterHeight(true);
                 recenterFramesRemaining = 0;
-                Debug.Log("HavenMoonVR experimental eye height: " + desiredEyeHeight.ToString("0.00") + " m");
+                Debug.Log("HavenMoonVR eye height: " + desiredEyeHeight.ToString("0.00") + " m");
             }
             else if (Input.GetKeyDown(KeyCode.F8))
             {
@@ -534,7 +842,7 @@ namespace HavenMoonVR
 
     internal sealed class SharedPoseReader
     {
-        private const string MappingName = "Local\\HavenMoonVR_1_1_ControllerState";
+        private const string MappingName = "Local\\HavenMoonVR_1_2_ControllerState";
         private const int FileMapRead = 0x0004;
         private const int Magic = 0x31564D48;
         private IntPtr mapping;

@@ -1,66 +1,65 @@
-# HavenMoonVR 1.1.1 Experimental — Incremental Installer v4
+# HavenMoonVR 1.2.0 Community Patch
 
-**HavenMoonVR was created by Massimo Giannelli using ChatGPT in Florence, Italy.**
+**Created by Massimo Giannelli using ChatGPT in Florence, Italy.**
 
-[Italiano](README_IT.md) · [Download the v4 ZIP](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.1.1-experimental/HavenMoonVR_1.1.1-Experimental.zip) · [Checksum](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.1.1-experimental/HavenMoonVR_1.1.1-Experimental_SHA256.txt) · [Troubleshooting](docs/TROUBLESHOOTING_EN.md)
+[Italiano](README_IT.md) · [Download](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.0/HavenMoonVR_1.2.0_CommunityPatch.zip) · [SHA-256](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.0/HavenMoonVR_1.2.0_CommunityPatch_SHA256.txt) · [Troubleshooting](docs/TROUBLESHOOTING_EN.md)
 
-> **Current public build:** Incremental Installer v4 — SHA-256 `f4f64c8ef456f60ebfcd8151cab54497cd9fb0428e49d3b0f49616d99265439c`.
->
-> Use the **Download the v4 ZIP** link above. GitHub's **Code → Download ZIP** button downloads the project source, not the complete installable package.
+> **Important:** this is an unofficial, rough-and-ready community patch made through practical testing. It is supplied **as-is**, with no guarantee that every scene, controller or PC configuration will behave perfectly. Keep the clean backup created by the installer.
 
-Unofficial PC VR prototype for Haven Moon, derived from the stable 1.0.2 line. This build replaces the fixed gameplay centre pointer with two independent tracked-controller rays.
+HavenMoonVR adds PC VR support to the Steam version of Haven Moon. Version 1.2.0 uses two independent tracked-controller rays, native Quest 2 aim poses, head-relative locomotion, corrected player collision, height recentering and stereo-safe ocean/horizon rendering.
 
-## What is new
+## Base-game compatibility
 
-- Left and right controller position/orientation come directly from SteamVR/OpenVR.
-- Each hand performs an independent raycast and can target a different object.
-- Thin blue-left and orange-right rays remain visible while the controllers are tracked.
-- A ray brightens and gains a surface dot when an interactable object is in range.
-- The left trigger activates the left-hand target; the right trigger activates the right-hand target.
-- Trigger release uses the same hysteresis-latched state as Fire1/Fire2 plus a short allowance so activation is not dropped.
-- The original centre-screen gameplay interaction ray is bypassed.
-- In VR the ocean uses the simplified Water4 shader without planar reflection or screen-space edge blending, avoiding the black horizon wedge seen during headset roll.
+The installer is designed to run directly on the **unmodified supported Steam build of Haven Moon**. No earlier HavenMoonVR version or other game patch is required.
 
-Head-relative locomotion, right-stick turning, FXAA, VR Origin, automatic height recenter, Y/F8 recenter and SteamVR quality configuration remain available. Recenter now compensates Haven Moon's existing 0.683 m camera offset instead of counting it twice; F7/F9 adjust the result in persistent 5 cm steps.
+Before changing anything, it verifies the original `HavenMoon.exe`, scenes and `Assembly-CSharp.dll` by SHA-256. If the build is unknown or already modified without a verified clean backup, installation stops without patching it. Original files are copied into `HavenMoonVR_Backup` for rollback.
 
-## Install
+## Main features
 
-1. Fully close Haven Moon, SteamVR and Steam.
-2. Extract the complete ZIP.
-3. Run `Install_HavenMoonVR.cmd`.
-4. Reopen Steam.
-5. Launch `Haven Moon VR Experimental` from Steam or SteamVR.
+- Independent left and right SteamVR controller pointers.
+- Quest 2 `openxr_aim` resolved through separate SteamVR left/right device paths.
+- Left/right triggers activate the object pointed to by the corresponding hand.
+- Fixed centre-screen gameplay pointer removed.
+- Head-relative locomotion and right-stick turning.
+- Symmetric character collision centred below the tracked headset.
+- Automatic height recenter, plus F7/F9 adjustment and Y/F8 reset.
+- Stereo-safe horizon and Water4 rendering without legacy planar reflection or screen GrabPass.
+- Cinematic image profile using the highest safe settings available in the original game.
+- Incremental installer: files already at the required version are left untouched.
+- Optional automatic Steam/SteamVR registration and custom Library artwork.
 
-The entry containing **Experimental** must be used. The older stable shortcut starts the 1.0.2 bridge, which does not publish the two controller poses.
+## Installation
 
-The installer accepts only the verified Steam game build and keeps a verified clean backup. It compares the SHA-256 hash of every generated game patch and experimental runtime file, updates only files that are missing or different, and leaves already-current files and their modification times untouched. The user's existing experimental display configuration is preserved. It also backs up `shortcuts.vdf` and adds or updates only the `Haven Moon VR Experimental` VR-library shortcut. The launcher locally embeds the icon from the user's installed `HavenMoon.exe`, and Steam uses that original executable as its icon source. No game artwork is included in this package.
+1. Install or verify the original Haven Moon through Steam.
+2. Close Haven Moon and SteamVR.
+3. Extract the complete release ZIP to a short normal path, for example `C:\HavenMoonVR`.
+4. Run `Install_HavenMoonVR.cmd`.
+5. Choose Steam registration:
+   - **Automatic:** Steam is closed, `Haven Moon VR Community Patch` is registered in the VR Library, artwork is installed, and Steam is reopened.
+   - **Manual:** Steam remains open and its shortcut database is not touched. Add `Haven Moon VR.exe` yourself and enable **Include in VR Library**.
+6. Start `Haven Moon VR Community Patch` from Steam/SteamVR, or run `Haven Moon VR.exe`.
 
 ## Controls
 
 | Control | Action |
 |---|---|
-| Left stick | Head-relative locomotion |
+| Left stick | Head-relative movement |
 | Right stick | Turn |
 | Left trigger | Activate left-hand target / Fire2 |
 | Right trigger | Activate right-hand target / Fire1 |
-| X | Decrement/opposite direction on the left pointer |
-| A | Increment/main direction on the right pointer |
-| Y | Height recenter |
-| F8 | Keyboard height-recenter fallback |
-| F7 | Lower camera by 5 cm and remember it |
-| F9 | Raise camera by 5 cm and remember it |
+| X | Opposite/decrement action |
+| A | Main/increment action |
+| Y or F8 | Recenter height |
+| F7 / F9 | Lower / raise camera by 5 cm |
 
-The stable 1.0.2 package is not modified. The stable and experimental patches cannot be active simultaneously on one Haven Moon installation. To return to 1.0.2, run this package's uninstaller and then reinstall the stable build.
+SteamVR per-application render resolution is not changed. Quest 2 testing found 100% at 90 Hz to be the safest starting point; higher values depend on the PC.
 
-World-object pointing is the focus of this prototype. Unity menus retain their original UI behavior and may still need mouse or keyboard input. See [known limitations](docs/KNOWN_LIMITATIONS.md).
+## Verification and removal
 
-## Repository layout
+- `Verify_Installation.cmd` performs a full SHA-256 audit.
+- `Configure_Display.cmd` changes only the desktop mirror window, not headset resolution.
+- `Uninstall_HavenMoonVR.cmd` restores verified clean game files and removes managed runtime files. The clean backup is retained.
 
-- `src/`: C# source for the in-game runtime, assembly patcher, Steam shortcut tool and launcher.
-- `installer/`: installer, OpenVR bridge and configuration scripts.
-- `docs/`: controls, troubleshooting, limitations and release notes.
-- GitHub Releases: complete ready-to-test ZIP and its SHA-256 checksum.
+The repository contains editable source and installer scripts, but no original Haven Moon files and no Valve `openvr_api.dll`. The complete installable package is distributed through GitHub Releases.
 
-The repository deliberately contains no original Haven Moon files and no Valve `openvr_api.dll`. See [build notes](build/BUILD.md), [credits](CREDITS.md) and [third-party notices](THIRD_PARTY_NOTICES.txt).
-
-HavenMoonVR is unofficial and is not affiliated with the Haven Moon developer or publisher, Valve, or OpenAI.
+HavenMoonVR is not affiliated with the Haven Moon developer or publisher, Valve, Meta or OpenAI.

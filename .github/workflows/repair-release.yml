@@ -1,4 +1,4 @@
-name: Repair experimental release package (manual)
+name: Repair community release package (manual)
 
 on:
   # This job replaces public release assets. Keep it manual so a normal
@@ -17,34 +17,28 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Compile experimental launcher
+      - name: Compile community launcher
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
           if (-not (Test-Path $csc)) { throw "C# compiler not found: $csc" }
           & $csc /nologo /target:winexe /optimize+ `
-            "/out:$PWD\Haven Moon VR Experimental.exe" `
+            "/out:$PWD\Haven Moon VR.exe" `
+            "/win32icon:$PWD\installer\Artwork\HavenMoonVR_LauncherIcon.ico" `
             /reference:System.dll /reference:System.Windows.Forms.dll `
-            'src\HavenMoonVR.ExperimentalLauncher.cs'
-          if ($LASTEXITCODE -ne 0) { throw 'Experimental launcher compilation failed.' }
-          if (-not (Test-Path 'Haven Moon VR Experimental.exe')) { throw 'Launcher output is missing.' }
+            'src\HavenMoonVR.Launcher.cs'
+          if ($LASTEXITCODE -ne 0) { throw 'Community launcher compilation failed.' }
+          if (-not (Test-Path 'Haven Moon VR.exe')) { throw 'Launcher output is missing.' }
 
-      - name: Repair latest 1.1.1 experimental ZIP
+      - name: Repair latest 1.2.0 community ZIP
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $releases = gh release list --limit 50 --json tagName,name,isDraft,isPrerelease,publishedAt | ConvertFrom-Json
-          $release = $releases | Where-Object {
-            (-not $_.isDraft) -and (($_.name -match '1\.1\.1') -or ($_.tagName -match '1\.1\.1'))
-          } | Select-Object -First 1
-          if (-not $release) {
-            $release = $releases | Where-Object { (-not $_.isDraft) -and $_.isPrerelease } | Select-Object -First 1
-          }
-          if (-not $release) { throw 'No experimental GitHub Release was found.' }
-
-          $tag = $release.tagName
+          $tag = 'v1.2.0'
+          gh release view $tag | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Release $tag was not found." }
           Write-Host "Repairing release $tag"
 
           $releaseInfo = gh release view $tag --json assets | ConvertFrom-Json
@@ -68,10 +62,10 @@ jobs:
           $packageRoot = $installer.Directory.FullName
 
           $required = @(
-            'Start_HavenMoonVR_Experimental.cmd',
-            'HavenMoonVR_InputBridge_Experimental.ps1',
-            'HavenMoonVR_Experimental_Display.ini',
-            'Runtime\HavenMoonVR.Experimental.dll',
+            'Start_HavenMoonVR.cmd',
+            'HavenMoonVR_InputBridge.ps1',
+            'HavenMoonVR_Display.ini',
+            'Runtime\HavenMoonVR.Runtime.dll',
             'Runtime\HavenMoonVR.AssemblyPatcher.exe',
             'Runtime\Mono.Cecil.dll',
             'Runtime\HavenMoonVR.SteamShortcutTool.exe'
@@ -83,7 +77,7 @@ jobs:
             }
           }
 
-          Copy-Item -LiteralPath 'Haven Moon VR Experimental.exe' -Destination (Join-Path $packageRoot 'Haven Moon VR Experimental.exe') -Force
+          Copy-Item -LiteralPath 'Haven Moon VR.exe' -Destination (Join-Path $packageRoot 'Haven Moon VR.exe') -Force
 
           $fixedZip = Join-Path $output $zipAsset.name
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -97,9 +91,9 @@ jobs:
           # Final content check before replacing the public asset.
           $verify = Join-Path $work 'verify'
           Expand-Archive -LiteralPath $fixedZip -DestinationPath $verify -Force
-          $launcher = Get-ChildItem -LiteralPath $verify -Recurse -Filter 'Haven Moon VR Experimental.exe' | Select-Object -First 1
-          if (-not $launcher) { throw 'Final repaired ZIP still has no experimental launcher.' }
-          if ($launcher.Length -le 0) { throw 'Experimental launcher in final ZIP is empty.' }
+          $launcher = Get-ChildItem -LiteralPath $verify -Recurse -Filter 'Haven Moon VR.exe' | Select-Object -First 1
+          if (-not $launcher) { throw 'Final repaired ZIP still has no community launcher.' }
+          if ($launcher.Length -le 0) { throw 'Community launcher in final ZIP is empty.' }
 
           $hash = (Get-FileHash -LiteralPath $fixedZip -Algorithm SHA256).Hash.ToLowerInvariant()
           $checksumAsset = $releaseInfo.assets | Where-Object { $_.name -match '(?i)(sha256|checksum).*\.txt$' } | Select-Object -First 1

@@ -1,11 +1,11 @@
-﻿param(
+param(
     [switch]$Diagnostic,
     [switch]$NoLaunch,
     [string]$GamePath
 )
 
 $ErrorActionPreference = 'Stop'
-$host.UI.RawUI.WindowTitle = "HavenMoonVR OpenVR Input Bridge 1.1 Experimental"
+$host.UI.RawUI.WindowTitle = "HavenMoonVR OpenVR Input Bridge 1.2.0 Community Patch"
 
 function Get-SteamRoots {
     $roots = New-Object System.Collections.Generic.List[string]
@@ -97,7 +97,9 @@ function Resolve-HavenMoon {
 
 $code = @'
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 
 [StructLayout(LayoutKind.Sequential)]
 public struct VRAxis {
@@ -137,6 +139,26 @@ public struct TrackedPose {
     public int trackingResult;
     [MarshalAs(UnmanagedType.I1)] public bool poseIsValid;
     [MarshalAs(UnmanagedType.I1)] public bool deviceIsConnected;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct RenderModelControllerModeState {
+    [MarshalAs(UnmanagedType.I1)] public bool scrollWheelVisible;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct RenderModelComponentState {
+    public HmdMatrix34 trackingToComponentRenderModel;
+    public HmdMatrix34 trackingToComponentLocal;
+    public uint properties;
+}
+
+public sealed class AimTransformResult {
+    public bool Valid;
+    public HmdMatrix34 Transform;
+    public string Component = "raw";
+    public string RenderModel = String.Empty;
+    public string Method = "raw";
 }
 
 public static class K32 {
@@ -181,9 +203,38 @@ public static class OVR {
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate int FnGetInt32TrackedDeviceProperty(uint device, int prop, ref int error);
 
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet=CharSet.Ansi)]
+    public delegate uint FnGetStringTrackedDeviceProperty(
+        uint device,
+        int prop,
+        [Out] StringBuilder value,
+        uint capacity,
+        ref int error);
+
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     [return: MarshalAs(UnmanagedType.I1)]
     public delegate bool FnGetControllerState(uint device, ref VRState state, uint stateSize);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet=CharSet.Ansi)]
+    public delegate int FnGetInputSourceHandle(string inputSourcePath, ref ulong handle);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet=CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public delegate bool FnGetRenderModelComponentStateForDevicePath(
+        string renderModelName,
+        string componentName,
+        ulong devicePath,
+        ref RenderModelControllerModeState modeState,
+        out RenderModelComponentState componentState);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet=CharSet.Ansi)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    public delegate bool FnGetRenderModelComponentState(
+        string renderModelName,
+        string componentName,
+        ref VRState controllerState,
+        ref RenderModelControllerModeState modeState,
+        out RenderModelComponentState componentState);
 
     static IntPtr GetFnPtr(IntPtr table, int index) {
         IntPtr p = Marshal.ReadIntPtr(table, index * IntPtr.Size);
@@ -216,9 +267,104 @@ public static class OVR {
             GetFnPtr(table,index), typeof(FnGetInt32TrackedDeviceProperty));
     }
 
+    public static FnGetStringTrackedDeviceProperty GetStringPropFn(IntPtr table, int index) {
+        return (FnGetStringTrackedDeviceProperty)Marshal.GetDelegateForFunctionPointer(
+            GetFnPtr(table,index), typeof(FnGetStringTrackedDeviceProperty));
+    }
+
     public static FnGetControllerState GetStateFn(IntPtr table, int index) {
         return (FnGetControllerState)Marshal.GetDelegateForFunctionPointer(
             GetFnPtr(table,index), typeof(FnGetControllerState));
+    }
+
+    public static FnGetInputSourceHandle GetInputSourceHandleFn(IntPtr table, int index) {
+        return (FnGetInputSourceHandle)Marshal.GetDelegateForFunctionPointer(
+            GetFnPtr(table,index), typeof(FnGetInputSourceHandle));
+    }
+
+    public static FnGetRenderModelComponentStateForDevicePath GetRenderModelComponentStateForDevicePathFn(IntPtr table, int index) {
+        return (FnGetRenderModelComponentStateForDevicePath)Marshal.GetDelegateForFunctionPointer(
+            GetFnPtr(table,index), typeof(FnGetRenderModelComponentStateForDevicePath));
+    }
+
+    public static FnGetRenderModelComponentState GetRenderModelComponentStateFn(IntPtr table, int index) {
+        return (FnGetRenderModelComponentState)Marshal.GetDelegateForFunctionPointer(
+            GetFnPtr(table,index), typeof(FnGetRenderModelComponentState));
+    }
+
+    public static string ReadTrackedDeviceString(
+        FnGetStringTrackedDeviceProperty getter,
+        uint device,
+        int property) {
+        StringBuilder value = new StringBuilder(1024);
+        int error = 0;
+        uint required = getter(device, property, value, (uint)value.Capacity, ref error);
+        if (error != 0 || required == 0) return String.Empty;
+        return value.ToString();
+    }
+
+    public static AimTransformResult ResolveNativeAimTransform(
+        FnGetStringTrackedDeviceProperty stringGetter,
+        FnGetRenderModelComponentStateForDevicePath devicePathComponentGetter,
+        FnGetControllerState stateGetter,
+        FnGetRenderModelComponentState componentGetter,
+        uint device,
+        ulong devicePath) {
+        AimTransformResult result = new AimTransformResult();
+        if (stringGetter == null) return result;
+
+        result.RenderModel = ReadTrackedDeviceString(stringGetter, device, 1003); // Prop_RenderModelName_String
+        if (String.IsNullOrEmpty(result.RenderModel)) return result;
+
+        VRState controllerState = new VRState();
+        bool hasLegacyState = stateGetter != null &&
+            stateGetter(device, ref controllerState, ControllerStateSize());
+
+        // Use the input-source-aware path first. This is the same modern API
+        // used by Valve's SteamVR Unity render-model component code, and lets
+        // SteamVR resolve the correct left/right controller component state.
+        string[] components = new string[] { "openxr_aim", "tip" };
+        for (int i = 0; i < components.Length; i++) {
+            RenderModelControllerModeState mode = new RenderModelControllerModeState();
+            RenderModelComponentState state;
+            bool found = false;
+            if (devicePathComponentGetter != null && devicePath != 0) {
+                found = devicePathComponentGetter(
+                    result.RenderModel,
+                    components[i],
+                    devicePath,
+                    ref mode,
+                    out state);
+                if (found && IsUsableTransform(state.trackingToComponentLocal)) {
+                    result.Valid = true;
+                    result.Transform = state.trackingToComponentLocal;
+                    result.Component = components[i];
+                    result.Method = "device path";
+                    return result;
+                }
+            }
+
+            // Compatibility only: older runtimes may expose the deprecated
+            // controller-state form but not the input-source-aware function.
+            mode = new RenderModelControllerModeState();
+            if (componentGetter != null && hasLegacyState &&
+                componentGetter(result.RenderModel, components[i], ref controllerState, ref mode, out state) &&
+                IsUsableTransform(state.trackingToComponentLocal)) {
+                result.Valid = true;
+                result.Transform = state.trackingToComponentLocal;
+                result.Component = components[i];
+                result.Method = "legacy state";
+                return result;
+            }
+        }
+        return result;
+    }
+
+    private static bool IsUsableTransform(HmdMatrix34 value) {
+        float forwardLength = (float)Math.Sqrt(
+            value.m2 * value.m2 + value.m6 * value.m6 + value.m10 * value.m10);
+        return !Single.IsNaN(forwardLength) && !Single.IsInfinity(forwardLength) &&
+            forwardLength > 0.5f && forwardLength < 1.5f;
     }
 
     public static uint ControllerStateSize() {
@@ -229,9 +375,14 @@ public static class OVR {
 public class PoseReader {
     private OVR.FnGetDeviceToAbsoluteTrackingPose getPoses;
     private TrackedPose[] poses = new TrackedPose[64];
+    private Dictionary<uint, HmdMatrix34> nativeAimTransforms = new Dictionary<uint, HmdMatrix34>();
 
     public PoseReader(IntPtr table, int functionIndex) {
         getPoses = OVR.GetPosesFn(table, functionIndex);
+    }
+
+    public void SetNativeAimTransform(uint device, HmdMatrix34 trackingToAim) {
+        nativeAimTransforms[device] = trackingToAim;
     }
 
     // Returns { forwardX, forwardZ, rightX, rightZ } in the HMD's
@@ -275,17 +426,25 @@ public class PoseReader {
         TrackedPose controller = poses[device];
         if (!controller.deviceIsConnected || !controller.poseIsValid) return;
 
-        float dx = controller.deviceToAbsolute.m3 - hmd.deviceToAbsolute.m3;
-        float dy = controller.deviceToAbsolute.m7 - hmd.deviceToAbsolute.m7;
-        float dz = controller.deviceToAbsolute.m11 - hmd.deviceToAbsolute.m11;
+        // Compose the tracked device pose with SteamVR's controller-specific
+        // openxr_aim (or tip) component.  Quest 2 therefore uses Meta/Valve's
+        // native default laser origin and angle instead of a guessed offset.
+        HmdMatrix34 aimToAbsolute = controller.deviceToAbsolute;
+        HmdMatrix34 trackingToAim;
+        if (nativeAimTransforms.TryGetValue(device, out trackingToAim))
+            aimToAbsolute = Multiply(controller.deviceToAbsolute, trackingToAim);
+
+        float dx = aimToAbsolute.m3 - hmd.deviceToAbsolute.m3;
+        float dy = aimToAbsolute.m7 - hmd.deviceToAbsolute.m7;
+        float dz = aimToAbsolute.m11 - hmd.deviceToAbsolute.m11;
 
         float px = hmd.deviceToAbsolute.m0 * dx + hmd.deviceToAbsolute.m4 * dy + hmd.deviceToAbsolute.m8 * dz;
         float py = hmd.deviceToAbsolute.m1 * dx + hmd.deviceToAbsolute.m5 * dy + hmd.deviceToAbsolute.m9 * dz;
         float pz = hmd.deviceToAbsolute.m2 * dx + hmd.deviceToAbsolute.m6 * dy + hmd.deviceToAbsolute.m10 * dz;
 
-        float ax = -controller.deviceToAbsolute.m2;
-        float ay = -controller.deviceToAbsolute.m6;
-        float az = -controller.deviceToAbsolute.m10;
+        float ax = -aimToAbsolute.m2;
+        float ay = -aimToAbsolute.m6;
+        float az = -aimToAbsolute.m10;
         float fx = hmd.deviceToAbsolute.m0 * ax + hmd.deviceToAbsolute.m4 * ay + hmd.deviceToAbsolute.m8 * az;
         float fy = hmd.deviceToAbsolute.m1 * ax + hmd.deviceToAbsolute.m5 * ay + hmd.deviceToAbsolute.m9 * az;
         float fz = hmd.deviceToAbsolute.m2 * ax + hmd.deviceToAbsolute.m6 * ay + hmd.deviceToAbsolute.m10 * az;
@@ -299,6 +458,23 @@ public class PoseReader {
         result[start + 4] = fx / length;
         result[start + 5] = fy / length;
         result[start + 6] = -fz / length;
+    }
+
+    public static HmdMatrix34 Multiply(HmdMatrix34 left, HmdMatrix34 right) {
+        HmdMatrix34 value = new HmdMatrix34();
+        value.m0 = left.m0 * right.m0 + left.m1 * right.m4 + left.m2 * right.m8;
+        value.m1 = left.m0 * right.m1 + left.m1 * right.m5 + left.m2 * right.m9;
+        value.m2 = left.m0 * right.m2 + left.m1 * right.m6 + left.m2 * right.m10;
+        value.m3 = left.m0 * right.m3 + left.m1 * right.m7 + left.m2 * right.m11 + left.m3;
+        value.m4 = left.m4 * right.m0 + left.m5 * right.m4 + left.m6 * right.m8;
+        value.m5 = left.m4 * right.m1 + left.m5 * right.m5 + left.m6 * right.m9;
+        value.m6 = left.m4 * right.m2 + left.m5 * right.m6 + left.m6 * right.m10;
+        value.m7 = left.m4 * right.m3 + left.m5 * right.m7 + left.m6 * right.m11 + left.m7;
+        value.m8 = left.m8 * right.m0 + left.m9 * right.m4 + left.m10 * right.m8;
+        value.m9 = left.m8 * right.m1 + left.m9 * right.m5 + left.m10 * right.m9;
+        value.m10 = left.m8 * right.m2 + left.m9 * right.m6 + left.m10 * right.m10;
+        value.m11 = left.m8 * right.m3 + left.m9 * right.m7 + left.m10 * right.m11 + left.m11;
+        return value;
     }
 }
 
@@ -373,7 +549,7 @@ public sealed class SharedPoseWriter : IDisposable {
     const int PAGE_READWRITE=0x04;
     const int FILE_MAP_ALL_ACCESS=0x000F001F;
     const int MAGIC=0x31564D48;
-    const string NAME="Local\\HavenMoonVR_1_1_ControllerState";
+    const string NAME="Local\\HavenMoonVR_1_2_ControllerState";
     IntPtr mapping;
     IntPtr view;
     int sequence;
@@ -440,7 +616,7 @@ public sealed class SharedPoseWriter : IDisposable {
 Add-Type -TypeDefinition $code -Language CSharp
 
 function Get-HavenMoonDisplaySettings {
-    $cfg=Join-Path $PSScriptRoot 'HavenMoonVR_Experimental_Display.ini'
+    $cfg=Join-Path $PSScriptRoot 'HavenMoonVR_Display.ini'
     $r=@{Width=1280;Height=720;Fullscreen=0}
 
     if(Test-Path -LiteralPath $cfg){
@@ -562,19 +738,62 @@ foreach($v in @('026','025','024','023','022','021','020','019')) {
 }
 if($table-eq [IntPtr]::Zero){throw 'No compatible IVRSystem function table found.'}
 
+$renderModelsTable=[IntPtr]::Zero
+$renderModelsIface=$null
+if([OVR]::VR_IsInterfaceVersionValid('IVRRenderModels_006')){
+    $renderModelsError=0
+    $candidate=[OVR]::VR_GetGenericInterface('FnTable:IVRRenderModels_006',[ref]$renderModelsError)
+    if($candidate-ne [IntPtr]::Zero -and $renderModelsError-eq 0){
+        $renderModelsTable=$candidate
+        $renderModelsIface='IVRRenderModels_006'
+    }
+}
+
+$inputTable=[IntPtr]::Zero
+$inputIface=$null
+foreach($v in @('011','010','009','008','007','006','005')){
+    $name="IVRInput_$v"
+    if([OVR]::VR_IsInterfaceVersionValid($name)){
+        $inputError=0
+        $candidate=[OVR]::VR_GetGenericInterface("FnTable:$name",[ref]$inputError)
+        if($candidate-ne [IntPtr]::Zero -and $inputError-eq 0){
+            $inputTable=$candidate
+            $inputIface=$name
+            break
+        }
+    }
+}
+
 # IVRSystem_026 function-table indices, matching Valve's generated openvr_api.cs:
 # 12 GetDeviceToAbsoluteTrackingPose
 # 18 GetTrackedDeviceIndexForControllerRole
 # 19 GetControllerRoleForTrackedDeviceIndex
 # 20 GetTrackedDeviceClass
 # 24 GetInt32TrackedDeviceProperty
+# 28 GetStringTrackedDeviceProperty
 # 37 GetControllerState
 $poseReader=[PoseReader]::new($table,12)
 $getByRole=[OVR]::GetByRoleFn($table,18)
 $getRole=[OVR]::GetRoleFn($table,19)
 $getClass=[OVR]::GetClassFn($table,20)
 $getIntProp=[OVR]::GetIntPropFn($table,24)
+$getStringProp=[OVR]::GetStringPropFn($table,28)
 $getState=[OVR]::GetStateFn($table,37)
+$getInputSource=$null
+$getRenderComponentStateForDevicePath=$null
+$getRenderComponentState=$null
+if($inputTable-ne [IntPtr]::Zero){
+    # IVRInput index 3: GetInputSourceHandle.
+    $getInputSource=[OVR]::GetInputSourceHandleFn($inputTable,3)
+}
+if($renderModelsTable-ne [IntPtr]::Zero){
+    # IVRRenderModels_006 index 13 is the input-source-aware API used by
+    # Valve's current Unity plugin for left/right render-model components.
+    $getRenderComponentStateForDevicePath=[OVR]::GetRenderModelComponentStateForDevicePathFn($renderModelsTable,13)
+    # IVRRenderModels_006 index 14 is the legacy GetComponentState call.
+    # Retain it only for older-runtime compatibility.
+    $getRenderComponentState=[OVR]::GetRenderModelComponentStateFn($renderModelsTable,14)
+}
 
 Write-Host "OpenVR Input Bridge active ($iface function table)" -ForegroundColor Green
 Write-Host "Direct SteamVR controller polling. Ctrl+C to stop."
@@ -656,8 +875,52 @@ if($left-eq $invalid -or $right-eq $invalid){
 }
 
 Write-Host 'Both VR controllers are ready.' -ForegroundColor Green
+
+$leftInputSource=[UInt64]0
+$rightInputSource=[UInt64]0
+if($null-ne $getInputSource){
+    $leftInputError=$getInputSource.Invoke('/user/hand/left',[ref]$leftInputSource)
+    $rightInputError=$getInputSource.Invoke('/user/hand/right',[ref]$rightInputSource)
+    if($leftInputError-ne 0){$leftInputSource=[UInt64]0}
+    if($rightInputError-ne 0){$rightInputSource=[UInt64]0}
+}
+
+function Set-NativeAimPose([string]$hand,[uint32]$device,[uint64]$inputSource){
+    if($null-eq $getRenderComponentStateForDevicePath -and $null-eq $getRenderComponentState){
+        Write-Host ("{0} pointer pose: SteamVR render-model API unavailable; using raw controller pose." -f $hand) -ForegroundColor Yellow
+        return
+    }
+
+    try{
+        $aim=[OVR]::ResolveNativeAimTransform(
+            $getStringProp,
+            $getRenderComponentStateForDevicePath,
+            $getState,
+            $getRenderComponentState,
+            $device,
+            $inputSource)
+        if($aim.Valid){
+            $poseReader.SetNativeAimTransform($device,$aim.Transform)
+            $forwardX=-[double]$aim.Transform.m2
+            $forwardY=-[double]$aim.Transform.m6
+            $forwardZ=-[double]$aim.Transform.m10
+            $horizontal=[Math]::Sqrt(($forwardX*$forwardX)+($forwardZ*$forwardZ))
+            $downDegrees=[Math]::Atan2(-$forwardY,$horizontal)*180.0/[Math]::PI
+            Write-Host ("{0} pointer pose: native SteamVR {1} via {2} ({3}); origin=[{4:N3},{5:N3},{6:N3}] m, down={7:N1} deg." -f `
+                $hand,$aim.Component,$aim.Method,$aim.RenderModel,$aim.Transform.m3,$aim.Transform.m7,$aim.Transform.m11,$downDegrees) -ForegroundColor Green
+        }else{
+            Write-Host ("{0} pointer pose: native aim component unavailable; using raw controller pose." -f $hand) -ForegroundColor Yellow
+        }
+    }catch{
+        Write-Host ("{0} pointer pose: native aim lookup failed; using raw controller pose. {1}" -f $hand,$_.Exception.Message) -ForegroundColor Yellow
+    }
+}
+
+Set-NativeAimPose 'Left' $left $leftInputSource
+Set-NativeAimPose 'Right' $right $rightInputSource
+
 $sharedWriter=[SharedPoseWriter]::new()
-Write-Host 'Experimental dual-pointer shared tracking is ready.' -ForegroundColor Green
+Write-Host 'Dual-pointer shared tracking is ready.' -ForegroundColor Green
 
 function Get-AxisInfo([uint32]$device){
     $stick=-1
@@ -838,7 +1101,7 @@ try {
         $prevReset=$resetPressed
 
         # Publish both tracked controller rays and their independent action
-        # states to the in-game experimental runtime. Keyboard E/Q remain held
+        # states to the in-game community-patch runtime. Keyboard E/Q remain held
         # so existing object scripts can keep reading Fire1/Fire2 unchanged.
         $aims=$poseReader.GetRelativeControllerAims($left,$right)
         $sharedWriter.Write($aims,$leftAction,$rightAction)

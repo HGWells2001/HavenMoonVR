@@ -39,6 +39,7 @@ internal static class HavenMoonVRAssemblyPatcher
                 .SelectMany(AllTypes)
                 .First(t => t.FullName == "UnityStandardAssets.Characters.FirstPerson.FirstPersonControllerHM");
             MethodDefinition update = controller.Methods.First(m => m.Name == "Update" && !m.HasParameters);
+            MethodDefinition fixedUpdate = controller.Methods.First(m => m.Name == "FixedUpdate" && !m.HasParameters);
 
             Instruction firstCentralRay = update.Body.Instructions.First(i =>
             {
@@ -58,16 +59,16 @@ internal static class HavenMoonVRAssemblyPatcher
             }
             if (ladderStart == null) throw new InvalidOperationException("Could not locate the post-interaction ladder block.");
 
-            AssemblyNameReference helperAssembly = module.AssemblyReferences.FirstOrDefault(a => a.Name == "HavenMoonVR.Experimental");
+            AssemblyNameReference helperAssembly = module.AssemblyReferences.FirstOrDefault(a => a.Name == "HavenMoonVR.Runtime");
             if (helperAssembly == null)
             {
-                helperAssembly = new AssemblyNameReference("HavenMoonVR.Experimental", new Version(1, 1, 0, 0));
+                helperAssembly = new AssemblyNameReference("HavenMoonVR.Runtime", new Version(1, 2, 0, 0));
                 module.AssemblyReferences.Add(helperAssembly);
             }
 
             AssemblyNameReference unityAssembly = module.AssemblyReferences.First(a => a.Name == "UnityEngine");
             TypeReference componentType = new TypeReference("UnityEngine", "Component", module, unityAssembly, false);
-            TypeReference helperType = new TypeReference("HavenMoonVR", "ExperimentalPointers", module, helperAssembly, false);
+            TypeReference helperType = new TypeReference("HavenMoonVR", "CommunityPatch", module, helperAssembly, false);
             MethodReference tick = new MethodReference("Tick", module.TypeSystem.Void, helperType)
             {
                 HasThis = false,
@@ -75,6 +76,35 @@ internal static class HavenMoonVRAssemblyPatcher
                 CallingConvention = MethodCallingConvention.Default
             };
             tick.Parameters.Add(new ParameterDefinition(componentType));
+
+            TypeReference characterControllerType = new TypeReference("UnityEngine", "CharacterController", module, unityAssembly, false);
+            TypeReference vector3Type = new TypeReference("UnityEngine", "Vector3", module, unityAssembly, true);
+            TypeReference collisionFlagsType = new TypeReference("UnityEngine", "CollisionFlags", module, unityAssembly, true);
+            MethodReference suppressDuplicateMove = NewMovementHook(
+                module,
+                helperType,
+                characterControllerType,
+                vector3Type,
+                collisionFlagsType,
+                "SuppressDuplicateMove");
+            MethodReference centeredMove = NewMovementHook(
+                module,
+                helperType,
+                characterControllerType,
+                vector3Type,
+                collisionFlagsType,
+                "MoveOnceCenteredOnHead");
+
+            Instruction[] movementCalls = fixedUpdate.Body.Instructions.Where(i =>
+            {
+                MethodReference method = i.Operand as MethodReference;
+                return method != null &&
+                    method.FullName == "UnityEngine.CollisionFlags UnityEngine.CharacterController::Move(UnityEngine.Vector3)";
+            }).ToArray();
+            if (movementCalls.Length != 2)
+                throw new InvalidOperationException("Expected exactly two duplicate CharacterController.Move calls in FixedUpdate.");
+            movementCalls[0].Operand = suppressDuplicateMove;
+            movementCalls[1].Operand = centeredMove;
 
             ILProcessor il = update.Body.GetILProcessor();
             Instruction loadController = il.Create(OpCodes.Ldarg_0);
@@ -100,10 +130,22 @@ internal static class HavenMoonVRAssemblyPatcher
             bool callPresent = checkedUpdate.Body.Instructions.Any(i =>
             {
                 MethodReference method = i.Operand as MethodReference;
-                return method != null && method.FullName == "System.Void HavenMoonVR.ExperimentalPointers::Tick(UnityEngine.Component)";
+                return method != null && method.FullName == "System.Void HavenMoonVR.CommunityPatch::Tick(UnityEngine.Component)";
             });
+            MethodDefinition checkedFixedUpdate = check.MainModule.Types
+                .SelectMany(AllTypes)
+                .First(t => t.FullName == controller.FullName)
+                .Methods.First(m => m.Name == "FixedUpdate" && !m.HasParameters);
+            string[] checkedMovementCalls = checkedFixedUpdate.Body.Instructions
+                .Select(i => i.Operand as MethodReference)
+                .Where(m => m != null && m.DeclaringType.FullName == "HavenMoonVR.CommunityPatch")
+                .Select(m => m.Name)
+                .ToArray();
             check.Dispose();
-            if (!callPresent) throw new InvalidOperationException("Post-write verification did not find the experimental pointer hook.");
+            if (!callPresent) throw new InvalidOperationException("Post-write verification did not find the community pointer hook.");
+            if (checkedMovementCalls.Count(n => n == "SuppressDuplicateMove") != 1 ||
+                checkedMovementCalls.Count(n => n == "MoveOnceCenteredOnHead") != 1)
+                throw new InvalidOperationException("Post-write verification did not find both collision-safe movement hooks.");
 
             Console.WriteLine(FileSha256(output));
             return 0;
@@ -121,6 +163,25 @@ internal static class HavenMoonVRAssemblyPatcher
         foreach (TypeDefinition nested in type.NestedTypes)
             foreach (TypeDefinition descendant in AllTypes(nested))
                 yield return descendant;
+    }
+
+    private static MethodReference NewMovementHook(
+        ModuleDefinition module,
+        TypeReference helperType,
+        TypeReference characterControllerType,
+        TypeReference vector3Type,
+        TypeReference collisionFlagsType,
+        string name)
+    {
+        MethodReference hook = new MethodReference(name, collisionFlagsType, helperType)
+        {
+            HasThis = false,
+            ExplicitThis = false,
+            CallingConvention = MethodCallingConvention.Default
+        };
+        hook.Parameters.Add(new ParameterDefinition(characterControllerType));
+        hook.Parameters.Add(new ParameterDefinition(vector3Type));
+        return hook;
     }
 
     private static string FileSha256(string path)

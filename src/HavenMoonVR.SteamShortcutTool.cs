@@ -44,12 +44,14 @@ internal static class HavenMoonVRSteamShortcutTool
 
             int preservedBefore = root.Children.Count(n =>
                 !String.Equals(GetString(n, "AppName"), appName, StringComparison.OrdinalIgnoreCase));
+            uint appId = 0;
             bool changed = command == "add"
-                ? AddOrUpdate(root, Path.GetFullPath(args[2]), appName, iconPath)
+                ? AddOrUpdate(root, Path.GetFullPath(args[2]), appName, iconPath, out appId)
                 : Remove(root, appName);
 
             if (!changed)
             {
+                if (command == "add") Console.WriteLine("APPID=" + appId.ToString(CultureInfo.InvariantCulture));
                 Console.WriteLine("UNCHANGED");
                 return 0;
             }
@@ -82,6 +84,7 @@ internal static class HavenMoonVRSteamShortcutTool
             if (File.Exists(path)) File.Replace(temporary, path, null);
             else File.Move(temporary, path);
             Console.WriteLine(command == "add" ? "ADDED_OR_UPDATED" : "REMOVED");
+            if (command == "add") Console.WriteLine("APPID=" + appId.ToString(CultureInfo.InvariantCulture));
             return 0;
         }
         catch (Exception ex)
@@ -91,7 +94,7 @@ internal static class HavenMoonVRSteamShortcutTool
         }
     }
 
-    private static bool AddOrUpdate(VdfNode root, string executable, string appName, string iconPath)
+    private static bool AddOrUpdate(VdfNode root, string executable, string appName, string iconPath, out uint appId)
     {
         List<VdfNode> matches = root.Children.Where(n => String.Equals(GetString(n, "AppName"), appName, StringComparison.OrdinalIgnoreCase)).ToList();
         VdfNode entry;
@@ -108,7 +111,7 @@ internal static class HavenMoonVRSteamShortcutTool
 
         string quotedExe = "\"" + executable + "\"";
         string quotedStart = "\"" + Path.GetDirectoryName(executable) + "\"";
-        uint appId = Crc32(Encoding.UTF8.GetBytes(quotedExe + appName)) | 0x80000000u;
+        appId = Crc32(Encoding.UTF8.GetBytes(quotedExe + appName)) | 0x80000000u;
 
         SetInt(entry, "appid", unchecked((int)appId));
         SetString(entry, "AppName", appName);

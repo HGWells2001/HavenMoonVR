@@ -1,9 +1,9 @@
 @echo off
-title HavenMoonVR OpenVR Input Bridge 1.1 Experimental
+title HavenMoonVR OpenVR Input Bridge 1.2.0 Community Patch
 cd /d "%~dp0"
 
 echo ==========================================
-echo HavenMoonVR OpenVR Input Bridge 1.1 Experimental
+echo HavenMoonVR OpenVR Input Bridge 1.2.0 Community Patch
 echo ==========================================
 echo.
 echo SteamVR verra' usato se aperto, oppure avviato automaticamente.
@@ -16,7 +16,7 @@ rem 32-bit parent; System32 is correct when the parent is already 64-bit.
 set "HMVR_POWERSHELL=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 if exist "%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe" set "HMVR_POWERSHELL=%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
 
-"%HMVR_POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0HavenMoonVR_InputBridge_Experimental.ps1"
+"%HMVR_POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0HavenMoonVR_InputBridge.ps1"
 set "HMVR_EXIT=%ERRORLEVEL%"
 
 echo.

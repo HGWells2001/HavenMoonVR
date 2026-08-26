@@ -4,7 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 
-[assembly: AssemblyVersion("1.1.1.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
 
 internal static class Program
 {
@@ -15,12 +15,12 @@ internal static class Program
         {
             string executable = Assembly.GetExecutingAssembly().Location;
             string directory = Path.GetDirectoryName(executable);
-            string script = Path.Combine(directory, "Start_HavenMoonVR_Experimental.cmd");
+            string script = Path.Combine(directory, "Start_HavenMoonVR.cmd");
             if (!File.Exists(script))
             {
                 MessageBox.Show(
-                    "Start_HavenMoonVR_Experimental.cmd was not found next to the experimental launcher.",
-                    "Haven Moon VR Experimental",
+                    "Start_HavenMoonVR.cmd was not found next to the HavenMoonVR launcher.",
+                    "Haven Moon VR",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return 2;
@@ -43,7 +43,7 @@ internal static class Program
         {
             MessageBox.Show(
                 ex.ToString(),
-                "Haven Moon VR Experimental launcher error",
+                "Haven Moon VR launcher error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
             return 1;

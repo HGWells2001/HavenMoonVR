@@ -1,6 +1,6 @@
-﻿$ErrorActionPreference='Stop'
+$ErrorActionPreference='Stop'
 
-$cfg=Join-Path $PSScriptRoot 'HavenMoonVR_Experimental_Display.ini'
+$cfg=Join-Path $PSScriptRoot 'HavenMoonVR_Display.ini'
 $regPath='HKCU:\Software\FrancoisRoussel\HavenMoon'
 
 function Read-Current {
@@ -51,7 +51,7 @@ function Save-Config([int]$w,[int]$h,[int]$fs){
 
 $c=Read-Current
 Write-Host ''
-Write-Host 'HavenMoonVR 1.1 Experimental - Display / mirror configuration' -ForegroundColor Cyan
+Write-Host 'HavenMoonVR 1.2.0 Community Patch - Display / mirror configuration' -ForegroundColor Cyan
 Write-Host ('Current: {0}x{1}, {2}' -f $c.Width,$c.Height,($(if($c.Fullscreen){'fullscreen'}else{'windowed'})))
 Write-Host ''
 Write-Host '1  1280 x 720'
