@@ -11,8 +11,8 @@
 - Rays remain dim when a target is out of range, not tagged as activable, blocked by another collider, or while the player is moving; only a valid target makes its ray bright and displays the hit dot.
 - Collision Fix v2 horizontally follows the tracked HMD with the character capsule only while the active camera remains inside the player hierarchy. Large physical room-scale steps near geometry still require care and additional in-headset testing.
 - Horizon Fix v3 additionally disables the legacy `GlobalFog` and `GlobalFogWATER` full-screen passes because they are not stereo-frustum safe. Unity's native scene fog remains, but atmospheric depth may look different from the original flat-screen game.
-- The community ocean uses Water4 LOD 300 without its LOD 500 screen GrabPass, planar reflection or screen-space edge blending. It is richer than the old LOD 200 fallback but reflections remain simpler than the original flat-screen path.
-- Cinematic Shaders v1 deliberately has a very high GPU cost. 8x MSAA, high-sample ambient occlusion, HDR bloom, ultra shadows and long LOD distances can reduce VR frame rate severely; this package is intended as a visual-quality test.
+- The community ocean uses the conservative Water4 LOD 200 path without its LOD 500 screen GrabPass, planar reflection or screen-space edge blending. Reflections remain simpler than the original flat-screen path because those effects are unsafe in legacy stereo VR.
+- Version 1.2.1 preserves the base game's visual profile and no longer forces the high-cost rendering overrides used by 1.2.0.
 - SteamVR render resolution above 100% can miss the 90 Hz frame budget on Quest 2 and appear as intermittent shaking or image doubling. The package does not alter this setting; start at 100% and increase it only after checking frame timing.
 - The build has been structurally verified without modifying the installed game, but final comfort, aim alignment and per-object behavior require an in-headset play test.
 

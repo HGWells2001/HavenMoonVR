@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.VR;
 
-[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.2.1.0")]
 
 namespace HavenMoonVR
 {
@@ -346,9 +346,10 @@ namespace HavenMoonVR
                     for (int i = 0; i < waterBases.Length; i++)
                     {
                         if (qualityField != null)
-                            // Water4 Medium unlocks its improved 300-LOD pass without
-                            // the 500-LOD screen GrabPass, which is unsafe in legacy VR.
-                            qualityField.SetValue(waterBases[i], Enum.ToObject(qualityField.FieldType, 1));
+                            // Keep the conservative Water4 200-LOD pass. It avoids the
+                            // legacy screen GrabPass while staying close to the base
+                            // game's normal visual and performance profile.
+                            qualityField.SetValue(waterBases[i], Enum.ToObject(qualityField.FieldType, 0));
                         if (edgeBlendField != null)
                             edgeBlendField.SetValue(waterBases[i], false);
                         if (updateShader != null)
@@ -357,14 +358,12 @@ namespace HavenMoonVR
                     }
                 }
 
-                int cinematicProfiles = ApplyCinematicRenderingProfile();
                 waterFallbackScene = scene;
                 waterFallbackMarker = sceneMarker != null ? sceneMarker : Camera.main;
                 if (fogCount > 0 || tileCount > 0 || waterCount > 0)
                     Debug.Log(
                         "HavenMoonVR VR-safe horizon fallback: " + fogCount +
-                        " legacy fog pass(es) disabled; planar reflection disabled; stereo-safe Water4 300-LOD shader enabled; " +
-                        cinematicProfiles + " cinematic post-processing profile(s) configured.");
+                        " legacy fog pass(es) disabled; planar reflection disabled; stereo-safe Water4 200-LOD shader enabled; base-game visual profile preserved.");
             }
             catch (Exception exception)
             {
@@ -372,238 +371,6 @@ namespace HavenMoonVR
                 waterFallbackMarker = Camera.main;
                 Debug.LogWarning("HavenMoonVR could not apply the VR-safe ocean fallback: " + exception.Message);
             }
-        }
-
-        private static int ApplyCinematicRenderingProfile()
-        {
-            // This intentionally prioritises image quality over GPU cost. All
-            // changes operate on normal scene rendering or per-eye-safe colour
-            // effects; the legacy fog and planar-reflection passes remain off.
-            Shader.globalMaximumLOD = 1000;
-            QualitySettings.masterTextureLimit = 0;
-            QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
-            QualitySettings.lodBias = 4.0f;
-            QualitySettings.maximumLODLevel = 0;
-            QualitySettings.pixelLightCount = 32;
-            QualitySettings.shadowResolution = ShadowResolution.VeryHigh;
-            QualitySettings.shadowProjection = ShadowProjection.StableFit;
-            QualitySettings.shadowCascades = 4;
-            QualitySettings.shadowDistance = 250.0f;
-            QualitySettings.realtimeReflectionProbes = true;
-            QualitySettings.antiAliasing = 8;
-
-            UnityEngine.Object[] shaders = Resources.FindObjectsOfTypeAll(typeof(Shader));
-            for (int i = 0; i < shaders.Length; i++)
-            {
-                Shader shader = shaders[i] as Shader;
-                if (shader != null)
-                    shader.maximumLOD = shader.name == "FX/Water4" ? 301 : 1000;
-            }
-
-            UnityEngine.Object[] textures = Resources.FindObjectsOfTypeAll(typeof(Texture2D));
-            for (int i = 0; i < textures.Length; i++)
-            {
-                Texture2D texture = textures[i] as Texture2D;
-                if (texture == null) continue;
-                texture.anisoLevel = 16;
-                texture.filterMode = FilterMode.Trilinear;
-                texture.mipMapBias = -0.35f;
-            }
-
-            UnityEngine.Object[] cameras = UnityEngine.Object.FindObjectsOfType(typeof(Camera));
-            for (int i = 0; i < cameras.Length; i++)
-            {
-                Camera camera = cameras[i] as Camera;
-                if (camera == null) continue;
-                camera.hdr = true;
-                camera.depthTextureMode |= DepthTextureMode.DepthNormals;
-            }
-
-            UnityEngine.Object[] terrains = UnityEngine.Object.FindObjectsOfType(typeof(Terrain));
-            for (int i = 0; i < terrains.Length; i++)
-            {
-                Terrain terrain = terrains[i] as Terrain;
-                if (terrain == null) continue;
-                terrain.heightmapPixelError = 1.0f;
-                terrain.basemapDistance = 10000.0f;
-                terrain.detailObjectDensity = 1.0f;
-                terrain.detailObjectDistance = 300.0f;
-                terrain.treeDistance = 5000.0f;
-                terrain.treeBillboardDistance = 1000.0f;
-                terrain.treeCrossFadeLength = 200.0f;
-                terrain.treeMaximumFullLODCount = 500;
-            }
-
-            UnityEngine.Object[] lights = UnityEngine.Object.FindObjectsOfType(typeof(Light));
-            for (int i = 0; i < lights.Length; i++)
-            {
-                Light light = lights[i] as Light;
-                if (light != null && light.shadows != LightShadows.None)
-                    light.shadowResolution = LightShadowResolution.VeryHigh;
-            }
-
-            return ConfigureCinematicPostProcessing();
-        }
-
-        private static int ConfigureCinematicPostProcessing()
-        {
-            Type behaviourType = FindLoadedType("UnityEngine.PostProcessing.PostProcessingBehaviour");
-            Type profileType = FindLoadedType("UnityEngine.PostProcessing.PostProcessingProfile");
-            if (behaviourType == null || profileType == null) return 0;
-
-            UnityEngine.Object[] profiles = Resources.FindObjectsOfTypeAll(profileType);
-            UnityEngine.Object normalProfile = null;
-            for (int i = 0; i < profiles.Length; i++)
-            {
-                if (profiles[i] != null && profiles[i].name == "HM_PostProcessings_Normal")
-                {
-                    normalProfile = profiles[i];
-                    break;
-                }
-            }
-            if (normalProfile == null) return 0;
-
-            ConfigureAmbientOcclusion(normalProfile);
-            ConfigureBloom(normalProfile);
-            ConfigureColorGrading(normalProfile);
-            SetPostProcessingModelEnabled(normalProfile, "screenSpaceReflection", false);
-            SetPostProcessingModelEnabled(normalProfile, "depthOfField", false);
-            SetPostProcessingModelEnabled(normalProfile, "motionBlur", false);
-            SetPostProcessingModelEnabled(normalProfile, "eyeAdaptation", false);
-            SetPostProcessingModelEnabled(normalProfile, "chromaticAberration", false);
-            SetPostProcessingModelEnabled(normalProfile, "grain", false);
-            SetPostProcessingModelEnabled(normalProfile, "vignette", false);
-
-            FieldInfo profileField = FindInstanceField(behaviourType, "profile");
-            if (profileField == null) return 0;
-
-            int configured = 0;
-            UnityEngine.Object[] behaviours = UnityEngine.Object.FindObjectsOfType(behaviourType);
-            for (int i = 0; i < behaviours.Length; i++)
-            {
-                if (behaviours[i] == null) continue;
-                profileField.SetValue(behaviours[i], normalProfile);
-                Behaviour behaviour = behaviours[i] as Behaviour;
-                if (behaviour != null) behaviour.enabled = true;
-                configured++;
-            }
-            return configured;
-        }
-
-        private static void ConfigureAmbientOcclusion(object profile)
-        {
-            object model = GetPostProcessingModel(profile, "ambientOcclusion");
-            if (model == null) return;
-            SetModelEnabled(model, true);
-
-            FieldInfo settingsField = FindInstanceField(model.GetType(), "m_Settings");
-            if (settingsField == null) return;
-            object settings = settingsField.GetValue(model);
-            SetValue(settings, "intensity", 2.0f);
-            SetValue(settings, "radius", 0.45f);
-            SetValue(settings, "sampleCount", 3);
-            SetValue(settings, "downsampling", false);
-            SetValue(settings, "ambientOnly", false);
-            SetValue(settings, "highPrecision", true);
-            settingsField.SetValue(model, settings);
-        }
-
-        private static void ConfigureBloom(object profile)
-        {
-            object model = GetPostProcessingModel(profile, "bloom");
-            if (model == null) return;
-            SetModelEnabled(model, true);
-
-            FieldInfo settingsField = FindInstanceField(model.GetType(), "m_Settings");
-            if (settingsField == null) return;
-            object settings = settingsField.GetValue(model);
-            FieldInfo bloomField = FindInstanceField(settings.GetType(), "bloom");
-            if (bloomField == null) return;
-            object bloom = bloomField.GetValue(settings);
-            SetValue(bloom, "intensity", 0.8f);
-            SetValue(bloom, "threshold", 1.05f);
-            SetValue(bloom, "softKnee", 0.75f);
-            SetValue(bloom, "radius", 7.0f);
-            SetValue(bloom, "antiFlicker", true);
-            bloomField.SetValue(settings, bloom);
-            settingsField.SetValue(model, settings);
-        }
-
-        private static void ConfigureColorGrading(object profile)
-        {
-            object model = GetPostProcessingModel(profile, "colorGrading");
-            if (model == null) return;
-            SetModelEnabled(model, true);
-
-            FieldInfo settingsField = FindInstanceField(model.GetType(), "m_Settings");
-            if (settingsField == null) return;
-            object settings = settingsField.GetValue(model);
-
-            FieldInfo tonemappingField = FindInstanceField(settings.GetType(), "tonemapping");
-            if (tonemappingField != null)
-            {
-                object tonemapping = tonemappingField.GetValue(settings);
-                SetValue(tonemapping, "tonemapper", 1); // ACES
-                tonemappingField.SetValue(settings, tonemapping);
-            }
-
-            FieldInfo basicField = FindInstanceField(settings.GetType(), "basic");
-            if (basicField != null)
-            {
-                object basic = basicField.GetValue(settings);
-                SetValue(basic, "postExposure", 0.10f);
-                SetValue(basic, "saturation", 1.08f);
-                SetValue(basic, "contrast", 1.12f);
-                basicField.SetValue(settings, basic);
-            }
-
-            settingsField.SetValue(model, settings);
-            PropertyInfo dirtyProperty = model.GetType().GetProperty(
-                "isDirty", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (dirtyProperty != null && dirtyProperty.CanWrite)
-                dirtyProperty.SetValue(model, true, null);
-        }
-
-        private static object GetPostProcessingModel(object profile, string fieldName)
-        {
-            if (profile == null) return null;
-            FieldInfo field = FindInstanceField(profile.GetType(), fieldName);
-            return field != null ? field.GetValue(profile) : null;
-        }
-
-        private static void SetPostProcessingModelEnabled(object profile, string fieldName, bool enabled)
-        {
-            object model = GetPostProcessingModel(profile, fieldName);
-            if (model != null) SetModelEnabled(model, enabled);
-        }
-
-        private static void SetModelEnabled(object model, bool enabled)
-        {
-            FieldInfo enabledField = FindInstanceField(model.GetType(), "m_Enabled");
-            if (enabledField != null) enabledField.SetValue(model, enabled);
-        }
-
-        private static void SetValue(object target, string fieldName, object value)
-        {
-            if (target == null) return;
-            FieldInfo field = FindInstanceField(target.GetType(), fieldName);
-            if (field == null) return;
-            if (field.FieldType.IsEnum)
-                field.SetValue(target, Enum.ToObject(field.FieldType, Convert.ToInt32(value)));
-            else
-                field.SetValue(target, value);
-        }
-
-        private static FieldInfo FindInstanceField(Type type, string name)
-        {
-            while (type != null)
-            {
-                FieldInfo field = type.GetField(
-                    name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (field != null) return field;
-                type = type.BaseType;
-            }
-            return null;
         }
 
         private static Type FindLoadedType(string fullName)

@@ -1,4 +1,4 @@
-HavenMoonVR 1.2.0 Community Patch - Third-party notices
+HavenMoonVR 1.2.1 Community Patch - Third-party notices
 ===================================================
 
 Mono.Cecil 0.11.5

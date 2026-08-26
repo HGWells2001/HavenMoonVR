@@ -12,6 +12,6 @@ Quest 2 Native Aim v3 queries `openxr_aim` through SteamVR's input-source-aware 
 
 Existing object scripts still receive Fire1/Fire2, preserving the main/opposite direction logic used by handles, knobs and similar mechanisms.
 
-## Cinematic rendering test
+## Visual profile
 
-Cinematic Shaders v1 forces the original materials and textures to their highest stereo-safe quality. It combines 8x MSAA with FXAA ExtremeQuality, 16x anisotropic filtering, very high shadows, long LOD distances, high-sample ambient occlusion, HDR bloom and ACES colour grading. Water4 uses LOD 300; its LOD 500 screen GrabPass, planar reflection and edge blend remain disabled because they rely on legacy screen-space rendering that is unsafe for the two VR eye projections.
+Version 1.2.1 preserves Haven Moon's original post-processing, anti-aliasing and quality settings. It does not force colour grading, bloom, ambient occlusion, MSAA, anisotropic filtering, shadows, textures or scene LODs. Water4 uses its conservative 200-LOD path; the legacy screen GrabPass, planar reflection and edge blend remain disabled because they are unsafe for the two VR eye projections.

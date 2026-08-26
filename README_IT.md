@@ -1,12 +1,12 @@
-# HavenMoonVR 1.2.0 Community Patch
+# HavenMoonVR 1.2.1 Community Patch
 
 **HavenMoonVR è stato realizzato da Massimo Giannelli tramite ChatGPT a Firenze, Italia.**
 
-[English](README.md) · [Scarica](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.0/HavenMoonVR_1.2.0_CommunityPatch.zip) · [SHA-256](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.0/HavenMoonVR_1.2.0_CommunityPatch_SHA256.txt) · [Risoluzione problemi](docs/RISOLUZIONE_PROBLEMI_IT.md)
+[English](README.md) · [Scarica](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.1/HavenMoonVR_1.2.1_CommunityPatch.zip) · [SHA-256](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.1/HavenMoonVR_1.2.1_CommunityPatch_SHA256.txt) · [Risoluzione problemi](docs/RISOLUZIONE_PROBLEMI_IT.md)
 
 > **Importante:** questa è una patch artigianale e non ufficiale, realizzata tramite prove pratiche. Viene fornita **così com'è**, senza garanzia che ogni scena, controller o configurazione PC funzioni perfettamente. Conserva il backup pulito creato dall'installer.
 
-HavenMoonVR aggiunge il supporto PC VR alla versione Steam di Haven Moon. La versione 1.2.0 usa due puntatori indipendenti, la posa nativa Quest 2, locomozione relativa alla testa, collisioni corrette, ricentraggio dell'altezza e rendering di oceano e orizzonte sicuro in stereo.
+HavenMoonVR aggiunge il supporto PC VR alla versione Steam di Haven Moon. La versione 1.2.1 usa due puntatori indipendenti, la posa nativa Quest 2, locomozione relativa alla testa, collisioni corrette, ricentraggio dell'altezza e rendering di oceano e orizzonte sicuro in stereo.
 
 ## Compatibilità con il gioco base
 
@@ -24,7 +24,7 @@ Prima di modificare qualsiasi cosa, controlla tramite SHA-256 `HavenMoon.exe`, s
 - Collisione simmetrica del personaggio centrata sotto il visore.
 - Ricentraggio automatico dell'altezza, regolazione F7/F9 e reset Y/F8.
 - Orizzonte e Water4 sicuri in stereo, senza riflessione planare o GrabPass legacy.
-- Profilo grafico cinematografico con le impostazioni più alte utilizzabili del gioco originale.
+- Profilo originale di Haven Moon per post-processing, anti-aliasing e qualità grafica.
 - Installer incrementale: i file già corretti non vengono riscritti.
 - Registrazione Steam/SteamVR automatica facoltativa e grafica personalizzata.
 

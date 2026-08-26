@@ -1,5 +1,5 @@
 @echo off
-title HavenMoonVR 1.2.0 Community Patch Verification
+title HavenMoonVR 1.2.1 Community Patch Verification
 cd /d "%~dp0"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0HavenMoonVR_Patcher.ps1" -Mode Verify %*
 echo.

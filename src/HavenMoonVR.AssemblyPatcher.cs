@@ -62,7 +62,7 @@ internal static class HavenMoonVRAssemblyPatcher
             AssemblyNameReference helperAssembly = module.AssemblyReferences.FirstOrDefault(a => a.Name == "HavenMoonVR.Runtime");
             if (helperAssembly == null)
             {
-                helperAssembly = new AssemblyNameReference("HavenMoonVR.Runtime", new Version(1, 2, 0, 0));
+                helperAssembly = new AssemblyNameReference("HavenMoonVR.Runtime", new Version(1, 2, 1, 0));
                 module.AssemblyReferences.Add(helperAssembly);
             }
 

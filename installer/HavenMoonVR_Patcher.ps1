@@ -12,14 +12,14 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$ModName = 'HavenMoonVR 1.2.0 Community Patch'
+$ModName = 'HavenMoonVR 1.2.1 Community Patch'
 $SteamShortcutName = 'Haven Moon VR Community Patch'
 $PatchDisclaimer = 'Unofficial rough-and-ready community patch, provided as-is / Patch artigianale non ufficiale, fornita cosi com''e.'
 $SupportedExeSha256 = 'd204db3128f654d052ee72c118604a183d1bcb32ff083edc3f038ac00879f96d'
 
 $OriginalAssemblySha256 = '863be6215489f7cce586539cc5feb146587cf433dabf31bac326e1a366d164f5'
-$PatchedAssemblySha256  = '95a109dc7789abce33793d43416d0dddc474aafe2aa28a20537e20787235e8ea'
-$RuntimeHelperSha256 = 'dc9de4b07a75cce23f2866435a5e335e44ad5ee1d0ce40eee93d400cd1d1b823'
+$PatchedAssemblySha256  = '8cbab2d06439e8c67724f6023cb7ef6f53e1172f157d9bfda910852e49f31c95'
+$RuntimeHelperSha256 = '2a7fd08da0353a5ea4788f323ec6567429c2f3eccdb9d68280cbb4d93366337a'
 $FastHashCache = @{}
 $FastHashCachePath = $null
 $FastHashCacheDirty = $false
@@ -47,7 +47,6 @@ $DefaultFinalHashes = @{
     'level4' = 'c564decd0c4e5097ecd8023eb91b9500d39a0c4aa0a0f7a95a4ba57dd36f6193'
     'level5' = 'fbf5a05222f8bc5cbb9896edad7a60390be5306735f908379e12fc64dcffa2c5'
     'level6' = 'eb4342a179f6cd8fe7e2ef6183cbfb39a0950f2c1c5abce89a4d8f0f74d1c4ce'
-    'sharedassets1.assets' = 'bd4393b224032d8b864720e81e90c48b32322560d4cdc19060754fbf6ae4e1a2'
 }
 
 $LevelPatches = @{
@@ -735,7 +734,7 @@ function Patch-AssemblyCommunity([byte[]]$Src,[string]$ManagedDir) {
     if(-not(Test-Path -LiteralPath $tool)){throw "Community assembly patcher missing: $tool"}
     if(-not(Test-Path -LiteralPath $cecil)){throw "Mono.Cecil runtime missing: $cecil"}
 
-    $tempDir=Join-Path ([IO.Path]::GetTempPath()) ('HavenMoonVR-1.2-'+[Guid]::NewGuid().ToString('N'))
+    $tempDir=Join-Path ([IO.Path]::GetTempPath()) ('HavenMoonVR-1.2.1-'+[Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tempDir | Out-Null
     $input=Join-Path $tempDir 'Assembly-CSharp.clean.dll'
     $output=Join-Path $tempDir 'Assembly-CSharp.community.dll'
@@ -753,27 +752,6 @@ function Patch-AssemblyCommunity([byte[]]$Src,[string]$ManagedDir) {
     }
 }
 
-
-function Patch-PostProcessingAA([byte[]]$Src) {
-    if($Src.Length-ne 49306640){throw 'Unexpected sharedassets1.assets size.'}
-
-    # Exact Haven Moon Unity 5.4.6f3 PostProcessingProfile validation.
-    # Method 0 = FXAA. Preset 0 = ExtremePerformance, preset 4 = ExtremeQuality.
-    if([BitConverter]::ToUInt32($Src,49304716)-ne 1){throw 'Unexpected Light AA enabled field.'}
-    if([BitConverter]::ToUInt32($Src,49304720)-ne 0){throw 'Unexpected Light AA method; expected FXAA.'}
-    if([BitConverter]::ToUInt32($Src,49304724)-ne 0){throw 'Unexpected Light FXAA preset.'}
-
-    if([BitConverter]::ToUInt32($Src,49305728)-ne 1){throw 'Unexpected Normal AA enabled field.'}
-    if([BitConverter]::ToUInt32($Src,49305732)-ne 0){throw 'Unexpected Normal AA method; expected FXAA.'}
-    if([BitConverter]::ToUInt32($Src,49305736)-ne 4){throw 'Unexpected Normal FXAA preset; expected ExtremeQuality.'}
-
-    # Bring the Light profile up to the same FXAA quality as Normal.
-    Write-U32LE $Src 49304724 4
-
-    $h=Get-BytesSha256 $Src
-    if($h-ne 'bd4393b224032d8b864720e81e90c48b32322560d4cdc19060754fbf6ae4e1a2'){throw "Internal sharedassets1.assets AA verification failed: $h"}
-    return $Src
-}
 
 function Ensure-HeightRange([double]$Y){if($Y-lt -2.0 -or $Y-gt 0.25){throw 'HeightOffset must be between -2.0 and +0.25 metres.'}}
 
@@ -921,16 +899,16 @@ function Install-Patch([string]$GameDir,[double]$Y,[ValidateSet('Auto','Manual')
         }elseif(Write-BytesIfChanged $destination $patched ("{0} (VR Origin {1} m)" -f $name,$Y)){$updatedFiles++}
     }
 
-    # VR anti-aliasing profile patch. The Normal profile is already FXAA
-    # ExtremeQuality; the Light profile is upgraded from ExtremePerformance
-    # to ExtremeQuality so both quality modes use the strongest built-in FXAA.
+    # Version 1.2.1 restores the game's original post-processing and AA asset.
+    # This also upgrades a 1.2.0 installation by replacing its altered copy
+    # with the verified clean backup, without touching unrelated game files.
     $sharedDest=Join-Path $dataDir 'sharedassets1.assets'
-    if(Test-FileMatchesExpectedFast $sharedDest $DefaultFinalHashes['sharedassets1.assets'] 'live:sharedassets1.assets'){
-        Write-Host 'Already current: sharedassets1.assets (fast check)' -ForegroundColor DarkGray
+    $sharedOriginalHash=$OriginalHashes['sharedassets1.assets']
+    if(Test-FileMatchesExpectedFast $sharedDest $sharedOriginalHash 'live:sharedassets1.assets'){
+        Write-Host 'Already current: original visual profile (fast check)' -ForegroundColor DarkGray
     }else{
         [byte[]]$sharedClean=[IO.File]::ReadAllBytes((Join-Path $backupDir 'sharedassets1.assets'))
-        [byte[]]$sharedPatched=Patch-PostProcessingAA $sharedClean
-        if(Write-KnownBytes $sharedDest $sharedPatched $DefaultFinalHashes['sharedassets1.assets'] 'sharedassets1.assets (FXAA ExtremeQuality)' 'live:sharedassets1.assets'){$updatedFiles++}
+        if(Write-KnownBytes $sharedDest $sharedClean $sharedOriginalHash 'sharedassets1.assets (original visual profile restored)' 'live:sharedassets1.assets'){$updatedFiles++}
     }
 
     # Community runtime hook: the original centre-screen interaction block is
@@ -972,11 +950,11 @@ function Install-Patch([string]$GameDir,[double]$Y,[ValidateSet('Auto','Manual')
         ('Custom HavenMoonVR launcher icon embedded: '+$launcherIconEmbedded),
         ('Steam registration mode: '+$RegistrationMode),
         'Horizon Fix v3: legacy GlobalFog/GlobalFogWATER stereo-incompatible passes disabled at runtime',
-        'Ocean rendering: stereo-safe Water4 300-LOD shader; planar reflection, screen GrabPass and edge blend disabled',
-        'Cinematic Shaders v1: ACES colour grading, high-sample ambient occlusion, HDR bloom, 8x MSAA, 16x anisotropic filtering, ultra shadows and LODs',
+        'Ocean rendering: conservative stereo-safe Water4 200-LOD shader; planar reflection, screen GrabPass and edge blend disabled',
+        'Visual profile: original Haven Moon post-processing, anti-aliasing and quality settings preserved',
         'Collision Fix v2: duplicate movement suppressed; one continuous move keeps the body capsule centred below the tracked HMD',
         'Fast installer checks: metadata cache first; SHA-256 after any size/timestamp change',
-        'Anti-aliasing: 8x MSAA plus FXAA ExtremeQuality',
+        'Anti-aliasing: original Haven Moon setting',
         'Steam/SteamVR artwork: Hero, Logo, Header, Capsule and Icon installed for automatically managed shortcuts'
     )|Set-Content -LiteralPath (Join-Path $backupDir 'HavenMoonVR_install_info.txt') -Encoding UTF8
     Write-Host ''
@@ -1010,7 +988,7 @@ function Uninstall-Patch([string]$GameDir,[ValidateSet('Auto','Manual')][string]
         Write-Host 'Manual Steam shortcuts were left untouched; remove yours manually if present.' -ForegroundColor Yellow
     }
     Remove-UserArtworkFiles $GameDir
-    Write-Host 'HavenMoonVR 1.2.0 Community Patch removed; clean game backups kept.' -ForegroundColor Green
+    Write-Host 'HavenMoonVR 1.2.1 Community Patch removed; clean game backups kept.' -ForegroundColor Green
 }
 
 function Verify-Patch([string]$GameDir) {
@@ -1021,8 +999,8 @@ function Verify-Patch([string]$GameDir) {
     foreach($name in @('globalgamemanagers','level0','level1','level2','level3','level4','level5','level6','sharedassets1.assets')){
         $p=Join-Path $dataDir $name;if(-not(Test-Path -LiteralPath $p)){Write-Host "$name : MISSING" -ForegroundColor Red;continue}
         $h=Get-FileSha256 $p
-        if($h-eq $OriginalHashes[$name]){Write-Host "$name : ORIGINAL" -ForegroundColor Yellow}
-        elseif($name-eq 'sharedassets1.assets' -and $DefaultFinalHashes.ContainsKey($name)-and $h-eq $DefaultFinalHashes[$name]){Write-Host "$name : FXAA EXTREME QUALITY (Normal + Light)" -ForegroundColor Green}
+        if($name-eq 'sharedassets1.assets' -and $h-eq $OriginalHashes[$name]){Write-Host "$name : ORIGINAL VISUAL PROFILE" -ForegroundColor Green}
+        elseif($h-eq $OriginalHashes[$name]){Write-Host "$name : ORIGINAL" -ForegroundColor Yellow}
         elseif($DefaultFinalHashes.ContainsKey($name)-and $h-eq $DefaultFinalHashes[$name]){Write-Host "$name : HavenMoonVR default (height -1.00 m, UI 0.35 m, VR-safe ocean horizon)" -ForegroundColor Green}
         elseif($name-like 'level[1-6]'){Write-Host "$name : PATCHED/CUSTOM HEIGHT (SHA $h)" -ForegroundColor Cyan}
         else{Write-Host "$name : MODIFIED/UNKNOWN (SHA $h)" -ForegroundColor Red}
@@ -1030,7 +1008,7 @@ function Verify-Patch([string]$GameDir) {
     $asm=Get-AssemblyPath $GameDir
     if(Test-Path -LiteralPath $asm){
         $ah=Get-FileSha256 $asm
-        if($ah-eq $PatchedAssemblySha256){Write-Host 'Assembly-CSharp.dll : HavenMoonVR 1.2.0 COMMUNITY DUAL POINTERS' -ForegroundColor Green}
+        if($ah-eq $PatchedAssemblySha256){Write-Host 'Assembly-CSharp.dll : HavenMoonVR 1.2.1 COMMUNITY DUAL POINTERS' -ForegroundColor Green}
         elseif($ah-eq $OriginalAssemblySha256){Write-Host 'Assembly-CSharp.dll : ORIGINAL (live reset missing)' -ForegroundColor Yellow}
         else{Write-Host "Assembly-CSharp.dll : MODIFIED/UNKNOWN ($ah)" -ForegroundColor Red}
     }else{Write-Host 'Assembly-CSharp.dll : MISSING' -ForegroundColor Red}
@@ -1039,7 +1017,7 @@ function Verify-Patch([string]$GameDir) {
     $helper=Join-Path $dataDir 'Managed\HavenMoonVR.Runtime.dll'
     if(Test-Path -LiteralPath $helper){
         $helperHash=Get-FileSha256 $helper
-        if($helperHash-eq $RuntimeHelperSha256){Write-Host 'HavenMoonVR.Runtime.dll : CINEMATIC SHADERS V1 + HORIZON FIX V3 + COLLISION FIX V2 OK' -ForegroundColor Green}
+        if($helperHash-eq $RuntimeHelperSha256){Write-Host 'HavenMoonVR.Runtime.dll : ORIGINAL VISUAL PROFILE + HORIZON FIX V3 + COLLISION FIX V2 OK' -ForegroundColor Green}
         else{Write-Host "HavenMoonVR.Runtime.dll : WRONG BUILD ($helperHash)" -ForegroundColor Red}
     }else{Write-Host 'HavenMoonVR.Runtime.dll : MISSING' -ForegroundColor Red}
     foreach($runtimeName in @('HavenMoonVR_InputBridge.ps1','Start_HavenMoonVR.cmd','Haven Moon VR.exe')){

@@ -31,12 +31,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Community launcher compilation failed.' }
           if (-not (Test-Path 'Haven Moon VR.exe')) { throw 'Launcher output is missing.' }
 
-      - name: Repair latest 1.2.0 community ZIP
+      - name: Repair latest 1.2.1 community ZIP
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $tag = 'v1.2.0'
+          $tag = 'v1.2.1'
           gh release view $tag | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "Release $tag was not found." }
           Write-Host "Repairing release $tag"

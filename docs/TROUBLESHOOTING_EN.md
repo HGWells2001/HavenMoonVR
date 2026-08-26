@@ -8,11 +8,11 @@ If those messages do not appear, wake and move both controllers, confirm that St
 
 ## The camera is too high or too low
 
-Press `F8` or controller `Y` to recenter. Use `F7` to lower and `F9` to raise the camera in 5 cm steps; the choice is remembered. Version 1.2.0 also fixes the original 0.683 m camera offset being counted twice.
+Press `F8` or controller `Y` to recenter. Use `F7` to lower and `F9` to raise the camera in 5 cm steps; the choice is remembered. Version 1.2.1 also fixes the original 0.683 m camera offset being counted twice.
 
 ## A black wedge appears between ocean and sky when the headset is rolled
 
-Horizon Fix v2 did not solve this on every headset. Install the Horizon Fix v3 test package over the existing community build. V3 disables Haven Moon's legacy `GlobalFog` and `GlobalFogWATER` full-screen filters, which calculate one desktop camera frustum instead of separate SteamVR eye projections. The native scene fog, ocean and waves remain; Cinematic Shaders v1 uses the richer Water4 LOD 300 path while keeping its screen GrabPass, planar reflection and edge blend disabled.
+Horizon Fix v3 disables Haven Moon's legacy `GlobalFog` and `GlobalFogWATER` full-screen filters, which calculate one desktop camera frustum instead of separate SteamVR eye projections. The native scene fog, ocean and waves remain; Water4 uses its conservative LOD 200 path while screen GrabPass, planar reflection and edge blend stay disabled.
 
 ## The graphics shake or the image intermittently doubles
 
@@ -56,4 +56,4 @@ This is normal: either SHA-256 or the unchanged-file cache confirmed that the fi
 
 ## Verify the installation
 
-Run `Verify_Installation.cmd`. If it reports `WRONG BUILD`, reinstall 1.2.0 using the complete contents of the ZIP.
+Run `Verify_Installation.cmd`. If it reports `WRONG BUILD`, reinstall 1.2.1 using the complete contents of the ZIP.

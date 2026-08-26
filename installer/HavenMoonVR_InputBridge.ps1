@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$host.UI.RawUI.WindowTitle = "HavenMoonVR OpenVR Input Bridge 1.2.0 Community Patch"
+$host.UI.RawUI.WindowTitle = "HavenMoonVR OpenVR Input Bridge 1.2.1 Community Patch"
 
 function Get-SteamRoots {
     $roots = New-Object System.Collections.Generic.List[string]

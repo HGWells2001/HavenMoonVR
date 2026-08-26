@@ -8,11 +8,11 @@ Se non appaiono, riattiva e muovi entrambi i controller, controlla che SteamVR l
 
 ## La telecamera è troppo alta o troppo bassa
 
-Premi `F8` oppure `Y` per ricentrare. Usa `F7` per abbassare e `F9` per alzare in passi di 5 cm; la scelta viene memorizzata. La 1.2.0 corregge anche il doppio conteggio dell'offset originale di 0,683 m.
+Premi `F8` oppure `Y` per ricentrare. Usa `F7` per abbassare e `F9` per alzare in passi di 5 cm; la scelta viene memorizzata. La 1.2.1 corregge anche il doppio conteggio dell'offset originale di 0,683 m.
 
 ## Compare un cuneo nero tra oceano e cielo inclinando la testa
 
-Horizon Fix v3 disattiva i vecchi filtri a schermo intero `GlobalFog` e `GlobalFogWATER`, che calcolano una sola telecamera piatta invece delle due proiezioni oculari SteamVR. Restano attivi la nebbia nativa della scena, l'oceano e le onde; Cinematic Shaders v1 usa il più ricco Water4 LOD 300 mantenendo disattivati GrabPass a schermo, riflessione planare ed edge blend.
+Horizon Fix v3 disattiva i vecchi filtri a schermo intero `GlobalFog` e `GlobalFogWATER`, che calcolano una sola telecamera piatta invece delle due proiezioni oculari SteamVR. Restano attivi la nebbia nativa della scena, l'oceano e le onde; Water4 usa il percorso conservativo LOD 200 mantenendo disattivati GrabPass a schermo, riflessione planare ed edge blend.
 
 ## La grafica trema o l'immagine si sdoppia a intermittenza
 
@@ -56,4 +56,4 @@ Se compare `Package file missing`, non usare **Code → Download ZIP** e non avv
 
 ## Controllo installazione
 
-Esegui `Verify_Installation.cmd`. Se segnala `WRONG BUILD`, reinstalla la 1.2.0 usando l'intero contenuto dello ZIP.
+Esegui `Verify_Installation.cmd`. Se segnala `WRONG BUILD`, reinstalla la 1.2.1 usando l'intero contenuto dello ZIP.

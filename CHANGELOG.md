@@ -1,6 +1,14 @@
-# HavenMoonVR 1.2.0 Community Patch
+# HavenMoonVR 1.2.1 Community Patch
 
 Created by Massimo Giannelli using ChatGPT in Florence, Italy.
+
+## 1.2.1 Community Patch
+
+- Removed the forced cinematic rendering profile after headset feedback.
+- Restored Haven Moon's original post-processing, anti-aliasing and quality settings.
+- Reverted Water4 to its conservative stereo-safe LOD 200 path while retaining the horizon, reflection and edge-blend protections.
+- The installer restores the original `sharedassets1.assets` from its verified clean backup when updating a 1.2.0 installation.
+- Controller pointers, trigger reliability, collision correction, camera height, Steam integration and artwork are unchanged.
 
 ## 1.2.0 Community Patch
 
