@@ -4,11 +4,11 @@ Created by Massimo Giannelli using ChatGPT in Florence, Italy.
 
 ## 1.2.1 Community Patch
 
-- Removed the forced cinematic rendering profile after headset feedback.
-- Restored Haven Moon's original post-processing, anti-aliasing and quality settings.
-- Reverted Water4 to its conservative stereo-safe LOD 200 path while retaining the horizon, reflection and edge-blend protections.
-- The installer restores the original `sharedassets1.assets` from its verified clean backup when updating a 1.2.0 installation.
-- Controller pointers, trigger reliability, collision correction, camera height, Steam integration and artwork are unchanged.
+- Removed the forced Cinematic Shaders profile introduced in 1.2.0 and restored Haven Moon's original post-processing, anti-aliasing, texture, shadow and LOD settings.
+- Restored `sharedassets1.assets` from the verified clean backup when upgrading from 1.2.0, without overwriting unrelated current files.
+- Returned Water4 to the conservative stereo-safe LOD 200 path while continuing to disable the legacy LOD 500 screen GrabPass, planar reflection and screen-space edge blend.
+- Retained Horizon Fix v3, native Quest 2 per-hand `openxr_aim`, independent controller pointers, Trigger Fix v3, Collision Fix v2, corrected camera height, Steam/SteamVR registration, custom artwork and the incremental SHA-256 installer.
+- SteamVR render resolution remains untouched; 100% at 90 Hz remains the recommended Quest 2 starting point.
 
 ## 1.2.0 Community Patch
 
