@@ -1,12 +1,12 @@
-# HavenMoonVR 1.2.0 Community Patch
+# HavenMoonVR 1.2.1 Community Patch
 
 **Created by Massimo Giannelli using ChatGPT in Florence, Italy.**
 
-[Italiano](README_IT.md) · [Download](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.0/HavenMoonVR_1.2.0_CommunityPatch.zip) · [SHA-256](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.0/HavenMoonVR_1.2.0_CommunityPatch_SHA256.txt) · [Troubleshooting](docs/TROUBLESHOOTING_EN.md)
+[Italiano](README_IT.md) · [Download](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.1/HavenMoonVR_1.2.1_CommunityPatch.zip) · [SHA-256](https://github.com/HGWells2001/HavenMoonVR/releases/download/v1.2.1/HavenMoonVR_1.2.1_CommunityPatch_SHA256.txt) · [Troubleshooting](docs/TROUBLESHOOTING_EN.md)
 
 > **Important:** this is an unofficial, rough-and-ready community patch made through practical testing. It is supplied **as-is**, with no guarantee that every scene, controller or PC configuration will behave perfectly. Keep the clean backup created by the installer.
 
-HavenMoonVR adds PC VR support to the Steam version of Haven Moon. Version 1.2.0 uses two independent tracked-controller rays, native Quest 2 aim poses, head-relative locomotion, corrected player collision, height recentering and stereo-safe ocean/horizon rendering.
+HavenMoonVR adds PC VR support to the Steam version of Haven Moon. Version 1.2.1 uses two independent tracked-controller rays, native Quest 2 aim poses, head-relative locomotion, corrected player collision, height recentering and stereo-safe ocean/horizon rendering.
 
 ## Base-game compatibility
 
@@ -24,7 +24,7 @@ Before changing anything, it verifies the original `HavenMoon.exe`, scenes and `
 - Symmetric character collision centred below the tracked headset.
 - Automatic height recenter, plus F7/F9 adjustment and Y/F8 reset.
 - Stereo-safe horizon and Water4 rendering without legacy planar reflection or screen GrabPass.
-- Cinematic image profile using the highest safe settings available in the original game.
+- Original Haven Moon post-processing, anti-aliasing and quality profile retained.
 - Incremental installer: files already at the required version are left untouched.
 - Optional automatic Steam/SteamVR registration and custom Library artwork.
 
