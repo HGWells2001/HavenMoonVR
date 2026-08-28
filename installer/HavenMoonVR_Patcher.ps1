@@ -12,14 +12,14 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-$ModName = 'HavenMoonVR 1.2.1 Community Patch'
+$ModName = 'HavenMoonVR 1.2.6 Community Patch'
 $SteamShortcutName = 'Haven Moon VR Community Patch'
 $PatchDisclaimer = 'Unofficial rough-and-ready community patch, provided as-is / Patch artigianale non ufficiale, fornita cosi com''e.'
 $SupportedExeSha256 = 'd204db3128f654d052ee72c118604a183d1bcb32ff083edc3f038ac00879f96d'
 
 $OriginalAssemblySha256 = '863be6215489f7cce586539cc5feb146587cf433dabf31bac326e1a366d164f5'
-$PatchedAssemblySha256  = '8cbab2d06439e8c67724f6023cb7ef6f53e1172f157d9bfda910852e49f31c95'
-$RuntimeHelperSha256 = '2a7fd08da0353a5ea4788f323ec6567429c2f3eccdb9d68280cbb4d93366337a'
+$PatchedAssemblySha256  = '26d72fcc305f854ff58e03ef075262f6bcccee0b6b4fdb7c012c354ea3d33821'
+$RuntimeHelperSha256 = '692790d9639070b60f4d5bb5ea978cf985045d5a2b4b6610d82effbd1a97e4a0'
 $FastHashCache = @{}
 $FastHashCachePath = $null
 $FastHashCacheDirty = $false
@@ -255,7 +255,7 @@ function Get-SteamRoots {
 }
 
 function Assert-GameAndSteamVRClosed {
-    $names=@('vrserver','vrmonitor','HavenMoon')
+    $names=@('HavenMoon','vrmonitor','vrserver','vrcompositor','vrdashboard','vrwebhelper','vrstartup','vrpathreg')
     $running=@()
     foreach($name in $names){
         if(Get-Process -Name $name -ErrorAction SilentlyContinue){$running+=$name}
@@ -263,6 +263,48 @@ function Assert-GameAndSteamVRClosed {
     if($running.Count-gt 0){
         throw ('Close SteamVR and Haven Moon before continuing. Still running: '+(($running|Select-Object -Unique)-join ', '))
     }
+}
+
+function Stop-GameAndSteamVR([string[]]$Names=@('HavenMoon','vrmonitor','vrserver','vrcompositor','vrdashboard','vrwebhelper','vrstartup','vrpathreg')) {
+    $running=@()
+    foreach($name in $names){
+        $running+=@(Get-Process -Name $name -ErrorAction SilentlyContinue)
+    }
+    if($running.Count-eq 0){
+        Write-Host 'Haven Moon and SteamVR are already closed.' -ForegroundColor DarkGray
+        return
+    }
+
+    $runningNames=@($running|ForEach-Object{$_.ProcessName}|Select-Object -Unique)
+    Write-Host ('Closing Haven Moon and SteamVR: '+($runningNames-join ', ')) -ForegroundColor Yellow
+
+    # Ask windowed applications to close normally first, then force only what remains.
+    foreach($process in $running){
+        try{if($process.MainWindowHandle-ne[IntPtr]::Zero){$null=$process.CloseMainWindow()}}catch{}
+    }
+    $deadline=(Get-Date).AddSeconds(4)
+    do{
+        Start-Sleep -Milliseconds 200
+        $remaining=@()
+        foreach($name in $names){$remaining+=@(Get-Process -Name $name -ErrorAction SilentlyContinue)}
+    }while($remaining.Count-gt 0-and(Get-Date)-lt$deadline)
+
+    if($remaining.Count-gt 0){
+        Write-Host 'Haven Moon or SteamVR did not close in time; forcing the remaining processes to close...' -ForegroundColor Yellow
+        $remaining|Stop-Process -Force -ErrorAction SilentlyContinue
+        $deadline=(Get-Date).AddSeconds(6)
+        do{
+            Start-Sleep -Milliseconds 200
+            $remaining=@()
+            foreach($name in $names){$remaining+=@(Get-Process -Name $name -ErrorAction SilentlyContinue)}
+        }while($remaining.Count-gt 0-and(Get-Date)-lt$deadline)
+    }
+
+    if($remaining.Count-gt 0){
+        $remainingNames=@($remaining|ForEach-Object{$_.ProcessName}|Select-Object -Unique)
+        throw ('Haven Moon or SteamVR could not be closed: '+($remainingNames-join ', '))
+    }
+    Write-Host 'Haven Moon and SteamVR are closed.' -ForegroundColor DarkGray
 }
 
 function Resolve-SteamExecutable {
@@ -280,8 +322,8 @@ function Resolve-SteamRegistrationChoice([string]$Requested) {
     Write-Host 'Steam registration / Registrazione in Steam' -ForegroundColor Cyan
     Write-Host ''
     Write-Host '1  Automatic (recommended) / Automatica (consigliata)'
-    Write-Host '   The installer closes Steam, registers the VR launcher and artwork, then reopens Steam.'
-    Write-Host '   L''installer chiude Steam, registra launcher e grafica VR, poi riapre Steam.'
+    Write-Host '   The installer closes Haven Moon, SteamVR and Steam, registers the VR launcher and artwork, then reopens Steam.'
+    Write-Host '   L''installer chiude Haven Moon, SteamVR e Steam, registra launcher e grafica VR, poi riapre Steam.'
     Write-Host ''
     Write-Host '2  Manual / Manuale'
     Write-Host '   Steam may remain open. No Steam database is changed; artwork is copied beside the game.'
@@ -734,7 +776,7 @@ function Patch-AssemblyCommunity([byte[]]$Src,[string]$ManagedDir) {
     if(-not(Test-Path -LiteralPath $tool)){throw "Community assembly patcher missing: $tool"}
     if(-not(Test-Path -LiteralPath $cecil)){throw "Mono.Cecil runtime missing: $cecil"}
 
-    $tempDir=Join-Path ([IO.Path]::GetTempPath()) ('HavenMoonVR-1.2.1-'+[Guid]::NewGuid().ToString('N'))
+    $tempDir=Join-Path ([IO.Path]::GetTempPath()) ('HavenMoonVR-1.2.6-'+[Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tempDir | Out-Null
     $input=Join-Path $tempDir 'Assembly-CSharp.clean.dll'
     $output=Join-Path $tempDir 'Assembly-CSharp.community.dll'
@@ -899,7 +941,7 @@ function Install-Patch([string]$GameDir,[double]$Y,[ValidateSet('Auto','Manual')
         }elseif(Write-BytesIfChanged $destination $patched ("{0} (VR Origin {1} m)" -f $name,$Y)){$updatedFiles++}
     }
 
-    # Version 1.2.1 restores the game's original post-processing and AA asset.
+    # Version 1.2.6 preserves the game's complete original visual asset.
     # This also upgrades a 1.2.0 installation by replacing its altered copy
     # with the verified clean backup, without touching unrelated game files.
     $sharedDest=Join-Path $dataDir 'sharedassets1.assets'
@@ -949,9 +991,9 @@ function Install-Patch([string]$GameDir,[double]$Y,[ValidateSet('Auto','Manual')
         'Eye height: original 0.683 m camera baseline with tracked-height compensation; F7/F9 adjust by 0.05 m; automatic per scene + Y/F8 reset',
         ('Custom HavenMoonVR launcher icon embedded: '+$launcherIconEmbedded),
         ('Steam registration mode: '+$RegistrationMode),
-        'Horizon Fix v3: legacy GlobalFog/GlobalFogWATER stereo-incompatible passes disabled at runtime',
-        'Ocean rendering: conservative stereo-safe Water4 200-LOD shader; planar reflection, screen GrabPass and edge blend disabled',
-        'Visual profile: original Haven Moon post-processing, anti-aliasing and quality settings preserved',
+        'Graphics: original Haven Moon rendering preserved except for the ocean planar reflection and targeted Water Enhanced VR material tuning',
+        'Ocean: planar reflection disabled; original Water4 path retained with stronger Fresnel, sharper specular light, subtle foam and 8x filtered water textures',
+        'VR warning: original water and horizon effects can show stereo artefacts when the headset is rolled',
         'Collision Fix v2: duplicate movement suppressed; one continuous move keeps the body capsule centred below the tracked HMD',
         'Fast installer checks: metadata cache first; SHA-256 after any size/timestamp change',
         'Anti-aliasing: original Haven Moon setting',
@@ -988,7 +1030,7 @@ function Uninstall-Patch([string]$GameDir,[ValidateSet('Auto','Manual')][string]
         Write-Host 'Manual Steam shortcuts were left untouched; remove yours manually if present.' -ForegroundColor Yellow
     }
     Remove-UserArtworkFiles $GameDir
-    Write-Host 'HavenMoonVR 1.2.1 Community Patch removed; clean game backups kept.' -ForegroundColor Green
+    Write-Host 'HavenMoonVR 1.2.6 Community Patch removed; clean game backups kept.' -ForegroundColor Green
 }
 
 function Verify-Patch([string]$GameDir) {
@@ -1001,14 +1043,14 @@ function Verify-Patch([string]$GameDir) {
         $h=Get-FileSha256 $p
         if($name-eq 'sharedassets1.assets' -and $h-eq $OriginalHashes[$name]){Write-Host "$name : ORIGINAL VISUAL PROFILE" -ForegroundColor Green}
         elseif($h-eq $OriginalHashes[$name]){Write-Host "$name : ORIGINAL" -ForegroundColor Yellow}
-        elseif($DefaultFinalHashes.ContainsKey($name)-and $h-eq $DefaultFinalHashes[$name]){Write-Host "$name : HavenMoonVR default (height -1.00 m, UI 0.35 m, VR-safe ocean horizon)" -ForegroundColor Green}
+        elseif($DefaultFinalHashes.ContainsKey($name)-and $h-eq $DefaultFinalHashes[$name]){Write-Host "$name : HavenMoonVR default (height -1.00 m, UI 0.35 m, original graphics)" -ForegroundColor Green}
         elseif($name-like 'level[1-6]'){Write-Host "$name : PATCHED/CUSTOM HEIGHT (SHA $h)" -ForegroundColor Cyan}
         else{Write-Host "$name : MODIFIED/UNKNOWN (SHA $h)" -ForegroundColor Red}
     }
     $asm=Get-AssemblyPath $GameDir
     if(Test-Path -LiteralPath $asm){
         $ah=Get-FileSha256 $asm
-        if($ah-eq $PatchedAssemblySha256){Write-Host 'Assembly-CSharp.dll : HavenMoonVR 1.2.1 COMMUNITY DUAL POINTERS' -ForegroundColor Green}
+        if($ah-eq $PatchedAssemblySha256){Write-Host 'Assembly-CSharp.dll : HavenMoonVR 1.2.6 COMMUNITY DUAL POINTERS' -ForegroundColor Green}
         elseif($ah-eq $OriginalAssemblySha256){Write-Host 'Assembly-CSharp.dll : ORIGINAL (live reset missing)' -ForegroundColor Yellow}
         else{Write-Host "Assembly-CSharp.dll : MODIFIED/UNKNOWN ($ah)" -ForegroundColor Red}
     }else{Write-Host 'Assembly-CSharp.dll : MISSING' -ForegroundColor Red}
@@ -1017,7 +1059,7 @@ function Verify-Patch([string]$GameDir) {
     $helper=Join-Path $dataDir 'Managed\HavenMoonVR.Runtime.dll'
     if(Test-Path -LiteralPath $helper){
         $helperHash=Get-FileSha256 $helper
-        if($helperHash-eq $RuntimeHelperSha256){Write-Host 'HavenMoonVR.Runtime.dll : ORIGINAL VISUAL PROFILE + HORIZON FIX V3 + COLLISION FIX V2 OK' -ForegroundColor Green}
+        if($helperHash-eq $RuntimeHelperSha256){Write-Host 'HavenMoonVR.Runtime.dll : WATER ENHANCED VR + OCEAN REFLECTION OFF + COLLISION FIX V2 OK' -ForegroundColor Green}
         else{Write-Host "HavenMoonVR.Runtime.dll : WRONG BUILD ($helperHash)" -ForegroundColor Red}
     }else{Write-Host 'HavenMoonVR.Runtime.dll : MISSING' -ForegroundColor Red}
     foreach($runtimeName in @('HavenMoonVR_InputBridge.ps1','Start_HavenMoonVR.cmd','Haven Moon VR.exe')){
@@ -1044,10 +1086,12 @@ try{
     switch($Mode){
         'Install'{
             $registrationMode=Resolve-SteamRegistrationChoice $SteamRegistration
-            Assert-GameAndSteamVRClosed
             if($registrationMode-eq'Auto'){
+                Stop-GameAndSteamVR
                 $steamExeToRestart=Resolve-SteamExecutable
                 Stop-SteamForShortcutUpdate $steamExeToRestart
+            }else{
+                Assert-GameAndSteamVRClosed
             }
             Install-Patch $resolvedGame $HeightOffset $registrationMode $true
         }
@@ -1058,10 +1102,12 @@ try{
         }
         'Uninstall'{
             $registrationMode=Get-InstalledSteamRegistrationMode $resolvedGame
-            Assert-GameAndSteamVRClosed
             if($registrationMode-eq'Auto'){
+                Stop-GameAndSteamVR
                 $steamExeToRestart=Resolve-SteamExecutable
                 Stop-SteamForShortcutUpdate $steamExeToRestart
+            }else{
+                Assert-GameAndSteamVRClosed
             }
             Uninstall-Patch $resolvedGame $registrationMode
         }

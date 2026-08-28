@@ -1,6 +1,41 @@
-# HavenMoonVR 1.2.1 Community Patch
+# HavenMoonVR 1.2.6 Community Patch
+
+## 1.2.6 Community Patch
+
+- Added the targeted **Water Enhanced VR** profile while keeping the ocean planar reflection disabled.
+- Increased Water4 Fresnel response and sharpened the specular sun highlight without adding a reflection camera.
+- Applied a subtle foam boost plus trilinear, 8x anisotropic filtering only to the ocean normal and shoreline textures.
+- Left wave geometry, screen GrabPass, shoreline blending, GlobalFog, post-processing, anti-aliasing and every non-water material unchanged.
+- Preserved the graphical installer's patch detection and **Uninstall** button.
+
+## 1.2.5 Community Patch
+
+- Disabled the complete ocean planar reflection, removing reflections of sky, clouds and scene objects.
+- Kept Water4 quality, waves, screen GrabPass, shoreline blending, GlobalFog, post-processing and anti-aliasing unchanged.
+- Preserved the graphical installer's patch detection and **Uninstall** button.
+
+## 1.2.4 Community Patch
+
+- Disabled only the skybox/cloud contribution in the ocean planar reflection by setting `PlanarReflection.reflectSkybox` to false.
+- Kept planar reflection for scene geometry and retained the original Water4 quality, GrabPass, shoreline blending, GlobalFog, post-processing and anti-aliasing.
+- Preserved the graphical installer's patch detection and **Uninstall** button.
+
+## 1.2.3 Community Patch
+
+- Restored the complete original Haven Moon graphics path by removing all runtime overrides for Water4, planar reflection, screen GrabPass, shoreline blending, `GlobalFog`, `GlobalFogWATER`, post-processing and anti-aliasing.
+- Removed the F10 Enhanced/Safe Water switch.
+- Kept controller pointers, interactions, locomotion, height and Collision Fix v2 unchanged.
+- Documented that original flat-screen effects can reintroduce the black horizon wedge or other stereo artefacts in VR.
+- The graphical Setup now detects an installed patch and enables an **Uninstall** button; it becomes available immediately after a successful installation.
 
 Created by Massimo Giannelli using ChatGPT in Florence, Italy.
+
+## 1.2.2 Community Patch
+
+- Restored Water4's richer LOD 300 path and depth-based shoreline edge blending.
+- Kept the stereo-incompatible LOD 500 screen GrabPass, planar reflection, `GlobalFog` and `GlobalFogWATER` disabled.
+- Added a persistent F10 toggle between Enhanced Water LOD 300 and the conservative Safe Water LOD 200 fallback.
+- Preserved Haven Moon's original post-processing and quality profile, plus every controller, collision, horizon and installer fix from 1.2.1.
 
 ## 1.2.1 Community Patch
 

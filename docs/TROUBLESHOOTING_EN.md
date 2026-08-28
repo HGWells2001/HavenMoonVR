@@ -8,11 +8,11 @@ If those messages do not appear, wake and move both controllers, confirm that St
 
 ## The camera is too high or too low
 
-Press `F8` or controller `Y` to recenter. Use `F7` to lower and `F9` to raise the camera in 5 cm steps; the choice is remembered. Version 1.2.1 also fixes the original 0.683 m camera offset being counted twice.
+Press `F8` or controller `Y` to recenter. Use `F7` to lower and `F9` to raise the camera in 5 cm steps; the choice is remembered. Version 1.2.6 also retains the fix for the original 0.683 m camera offset being counted twice.
 
 ## A black wedge appears between ocean and sky when the headset is rolled
 
-Horizon Fix v3 disables Haven Moon's legacy `GlobalFog` and `GlobalFogWATER` full-screen filters, which calculate one desktop camera frustum instead of separate SteamVR eye projections. The native scene fog, ocean and waves remain; Water4 uses its conservative LOD 200 path while screen GrabPass, planar reflection and edge blend stay disabled.
+Version 1.2.6 disables the ocean planar reflection completely, removing reflected sky, clouds and scene objects. Water Enhanced VR adjusts only the water Fresnel, tint, specular light, foam and texture filtering. `GlobalFog`, `GlobalFogWATER`, the screen GrabPass and shoreline blending remain original, so a stereo artefact may still occur on some configurations. There is no F10 fallback; use 1.2.5 for the same reflection exclusion without the new tuning, or 1.2.2 for conservative VR-safe ocean rendering.
 
 ## The graphics shake or the image intermittently doubles
 
@@ -42,7 +42,7 @@ Fully close Haven Moon and SteamVR. Steam may remain open in manual registration
 
 ## Automatic or manual Steam registration
 
-With **Automatic**, the installer closes Steam, backs up `shortcuts.vdf`, registers `Haven Moon VR Community Patch` in the VR Library and reopens Steam even if installation ends with an error. With **Manual**, Steam may remain open and the installer never touches its shortcut database: add `Haven Moon VR.exe` as a non-Steam game, rename it `Haven Moon VR Community Patch`, and enable **Include in VR Library**. Uninstall does not remove a shortcut you created manually.
+With **Automatic**, the installer closes Haven Moon, SteamVR and Steam, backs up `shortcuts.vdf`, registers `Haven Moon VR Community Patch` in the VR Library and reopens Steam even if installation ends with an error. With **Manual**, Steam may remain open, Haven Moon and SteamVR must already be closed, and the installer never touches its shortcut database: add `Haven Moon VR.exe` as a non-Steam game, rename it `Haven Moon VR Community Patch`, and enable **Include in VR Library**. Uninstall does not remove a shortcut you created manually.
 
 ## Custom artwork does not appear in Steam or SteamVR
 
@@ -56,4 +56,4 @@ This is normal: either SHA-256 or the unchanged-file cache confirmed that the fi
 
 ## Verify the installation
 
-Run `Verify_Installation.cmd`. If it reports `WRONG BUILD`, reinstall 1.2.1 using the complete contents of the ZIP.
+Run `Verify_Installation.cmd`. If it reports `WRONG BUILD`, reinstall 1.2.6 using the complete contents of the ZIP.

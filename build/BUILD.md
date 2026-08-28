@@ -10,6 +10,7 @@ The release package is intentionally self-contained for users, while this reposi
 - `HavenMoonVR.AssemblyPatcher.exe`: compile `src/HavenMoonVR.AssemblyPatcher.cs` for .NET Framework 4 and reference Mono.Cecil 0.11.5.
 - `HavenMoonVR.SteamShortcutTool.exe`: compile `src/HavenMoonVR.SteamShortcutTool.cs` for .NET Framework 4.
 - `Haven Moon VR.exe`: compile `src/HavenMoonVR.Launcher.cs` as a Windows executable for .NET Framework 4 AnyCPU and embed `Artwork/HavenMoonVR_LauncherIcon.ico` with `/win32icon`.
+- `HavenMoonVR_1.2.6_Setup.exe`: run `build/Build-GraphicalInstaller.ps1` with the verified release ZIP. It compiles `src/HavenMoonVR.Setup.cs` as a .NET Framework Windows executable, embeds the complete ZIP plus its SHA-256, and uses the Steam Hero, Logo and multi-resolution launcher icon for the graphical interface.
 - Also place `src/HavenMoonVR.Launcher.cs` in the release package as `Runtime/HavenMoonVR.Launcher.cs`. During installation the patcher recompiles the launcher with the packaged custom multi-resolution icon and verifies the embedded 32-pixel representation. If local compilation is unavailable, the icon-enabled prebuilt launcher remains valid.
 - `HavenMoonVR_InputBridge.ps1`: embeds the OpenVR interop types used by the external controller bridge.
 - `prepare_steam_artwork.py`: uses Pillow to produce the Valve-sized Capsule, Header, Hero and transparent Logo assets from the approved source artwork and prepared image edits. Keep the Hero text-free and verify that the Logo contains a real alpha channel.
@@ -31,3 +32,4 @@ Before publishing a ZIP:
 8. Confirm exact artwork dimensions and real Logo transparency.
 9. Generate `FILE_HASHES_SHA256.txt`, extract the final ZIP and compare every file hash.
 10. Publish a separate SHA-256 checksum for the ZIP.
+11. Run the graphical setup executable with `--self-test <report-path>` and confirm `SELF-TEST OK`. Render its off-screen preview with `--render-preview <png-path>` and visually inspect the bilingual window before publishing the EXE and its separate SHA-256 file.

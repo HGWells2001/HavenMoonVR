@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.VR;
 
-[assembly: AssemblyVersion("1.2.1.0")]
+[assembly: AssemblyVersion("1.2.6.0")]
 
 namespace HavenMoonVR
 {
@@ -41,8 +41,10 @@ namespace HavenMoonVR
         private static int leftReleaseGraceFrames;
         private static int rightReleaseGraceFrames;
         private static float desiredEyeHeight = -1.0f;
-        private static string waterFallbackScene = String.Empty;
-        private static UnityEngine.Object waterFallbackMarker;
+        private static string planarReflectionScene = String.Empty;
+        private static UnityEngine.Object planarReflectionMarker;
+        private static string enhancedWaterScene = String.Empty;
+        private static UnityEngine.Object enhancedWaterMarker;
 
         // Haven Moon's original FixedUpdate calls CharacterController.Move twice
         // with the same vector. The patcher redirects the first call here and the
@@ -86,7 +88,8 @@ namespace HavenMoonVR
         public static void Tick(Component controller)
         {
             HideFixedCrossHair();
-            ApplyVrSafeOceanFallback();
+            DisableOceanPlanarReflection();
+            EnhanceOceanWater();
             UpdateHeightRecenter();
 
             Camera camera = Camera.main;
@@ -256,47 +259,16 @@ namespace HavenMoonVR
                 crossHair.SetActive(false);
         }
 
-        private static void ApplyVrSafeOceanFallback()
+        private static void DisableOceanPlanarReflection()
         {
             string scene = SceneManager.GetActiveScene().name;
-            if (scene == waterFallbackScene && waterFallbackMarker != null) return;
+            if (scene == planarReflectionScene && planarReflectionMarker != null) return;
 
             try
             {
-                int fogCount = 0;
-                int tileCount = 0;
-                int waterCount = 0;
-                UnityEngine.Object sceneMarker = null;
-
-                // Haven Moon attaches both GlobalFog and GlobalFogWATER to the
-                // player camera. Their legacy full-screen blits reconstruct one
-                // symmetric desktop frustum from Camera.fieldOfView/aspect. In
-                // stereo VR each eye has an asymmetric projection, so rolling
-                // the HMD exposes an unrendered black wedge at the horizon.
-                // Keep Unity's native scene fog, but remove these two incompatible
-                // post-processing passes from the community VR runtime.
-                string[] legacyFogTypes = new string[]
-                {
-                    "UnityStandardAssets.ImageEffects.GlobalFog",
-                    "UnityStandardAssets.ImageEffects.GlobalFogWATER"
-                };
-                for (int fogTypeIndex = 0; fogTypeIndex < legacyFogTypes.Length; fogTypeIndex++)
-                {
-                    Type fogType = FindLoadedType(legacyFogTypes[fogTypeIndex]);
-                    if (fogType == null) continue;
-
-                    UnityEngine.Object[] fogEffects = UnityEngine.Object.FindObjectsOfType(fogType);
-                    if (sceneMarker == null && fogEffects.Length > 0) sceneMarker = fogEffects[0];
-                    for (int i = 0; i < fogEffects.Length; i++)
-                    {
-                        Behaviour behaviour = fogEffects[i] as Behaviour;
-                        if (behaviour != null && behaviour.enabled)
-                        {
-                            behaviour.enabled = false;
-                            fogCount++;
-                        }
-                    }
-                }
+                int disconnectedTiles = 0;
+                int disabledReflections = 0;
+                UnityEngine.Object marker = null;
 
                 Type tileType = FindLoadedType("UnityStandardAssets.Water.WaterTile");
                 if (tileType != null)
@@ -305,15 +277,16 @@ namespace HavenMoonVR
                         "reflection",
                         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                     UnityEngine.Object[] tiles = UnityEngine.Object.FindObjectsOfType(tileType);
-                    if (tiles.Length > 0) sceneMarker = tiles[0];
+                    if (tiles.Length > 0) marker = tiles[0];
                     if (reflectionField != null)
                     {
                         for (int i = 0; i < tiles.Length; i++)
                         {
-                            // WaterTile calls PlanarReflection directly even when that
-                            // component is disabled, so clear its cached reference.
-                            reflectionField.SetValue(tiles[i], null);
-                            tileCount++;
+                            if (reflectionField.GetValue(tiles[i]) != null)
+                            {
+                                reflectionField.SetValue(tiles[i], null);
+                                disconnectedTiles++;
+                            }
                         }
                     }
                 }
@@ -322,55 +295,89 @@ namespace HavenMoonVR
                 if (reflectionType != null)
                 {
                     UnityEngine.Object[] reflections = UnityEngine.Object.FindObjectsOfType(reflectionType);
+                    if (marker == null && reflections.Length > 0) marker = reflections[0];
                     for (int i = 0; i < reflections.Length; i++)
                     {
                         Behaviour behaviour = reflections[i] as Behaviour;
-                        if (behaviour != null) behaviour.enabled = false;
+                        if (behaviour != null && behaviour.enabled)
+                        {
+                            behaviour.enabled = false;
+                            disabledReflections++;
+                        }
                     }
                 }
 
-                Type waterBaseType = FindLoadedType("UnityStandardAssets.Water.WaterBase");
-                if (waterBaseType != null)
-                {
-                    FieldInfo qualityField = waterBaseType.GetField(
-                        "waterQuality",
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    FieldInfo edgeBlendField = waterBaseType.GetField(
-                        "edgeBlend",
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    MethodInfo updateShader = waterBaseType.GetMethod(
-                        "UpdateShader",
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    UnityEngine.Object[] waterBases = UnityEngine.Object.FindObjectsOfType(waterBaseType);
-                    if (sceneMarker == null && waterBases.Length > 0) sceneMarker = waterBases[0];
-                    for (int i = 0; i < waterBases.Length; i++)
-                    {
-                        if (qualityField != null)
-                            // Keep the conservative Water4 200-LOD pass. It avoids the
-                            // legacy screen GrabPass while staying close to the base
-                            // game's normal visual and performance profile.
-                            qualityField.SetValue(waterBases[i], Enum.ToObject(qualityField.FieldType, 0));
-                        if (edgeBlendField != null)
-                            edgeBlendField.SetValue(waterBases[i], false);
-                        if (updateShader != null)
-                            updateShader.Invoke(waterBases[i], null);
-                        waterCount++;
-                    }
-                }
-
-                waterFallbackScene = scene;
-                waterFallbackMarker = sceneMarker != null ? sceneMarker : Camera.main;
-                if (fogCount > 0 || tileCount > 0 || waterCount > 0)
-                    Debug.Log(
-                        "HavenMoonVR VR-safe horizon fallback: " + fogCount +
-                        " legacy fog pass(es) disabled; planar reflection disabled; stereo-safe Water4 200-LOD shader enabled; base-game visual profile preserved.");
+                if (marker == null) return;
+                planarReflectionScene = scene;
+                planarReflectionMarker = marker;
+                if (disconnectedTiles > 0 || disabledReflections > 0)
+                    Debug.Log("[HavenMoonVR] Ocean planar reflection disabled: " +
+                        disconnectedTiles + " WaterTile reference(s) disconnected, " +
+                        disabledReflections + " reflection component(s) disabled. Other original rendering remains active.");
             }
-            catch (Exception exception)
+            catch (Exception ex)
             {
-                waterFallbackScene = scene;
-                waterFallbackMarker = Camera.main;
-                Debug.LogWarning("HavenMoonVR could not apply the VR-safe ocean fallback: " + exception.Message);
+                Debug.LogWarning("[HavenMoonVR] Could not disable the ocean planar reflection: " + ex.Message);
             }
+        }
+
+        private static void EnhanceOceanWater()
+        {
+            string scene = SceneManager.GetActiveScene().name;
+            if (scene == enhancedWaterScene && enhancedWaterMarker != null) return;
+
+            try
+            {
+                int materialCount = 0;
+                int textureCount = 0;
+                UnityEngine.Object marker = null;
+                UnityEngine.Object[] materials = Resources.FindObjectsOfTypeAll(typeof(Material));
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    Material material = materials[i] as Material;
+                    if (material == null || material.shader == null || material.shader.name != "FX/Water4")
+                        continue;
+
+                    if (marker == null) marker = material;
+                    if (material.HasProperty("_FresnelScale"))
+                        material.SetFloat("_FresnelScale", 0.25f);
+                    if (material.HasProperty("_ReflectionColor"))
+                        material.SetColor("_ReflectionColor", new Color(0.24f, 0.39f, 0.50f, 0.50f));
+                    if (material.HasProperty("_Shininess"))
+                        material.SetFloat("_Shininess", 45.0f);
+                    if (material.HasProperty("_Foam"))
+                    {
+                        Vector4 foam = material.GetVector("_Foam");
+                        foam.x = Mathf.Max(foam.x, 0.24f);
+                        material.SetVector("_Foam", foam);
+                    }
+
+                    textureCount += EnhanceWaterTexture(material, "_BumpMap");
+                    textureCount += EnhanceWaterTexture(material, "_ShoreTex");
+                    materialCount++;
+                }
+
+                if (marker == null) return;
+                enhancedWaterScene = scene;
+                enhancedWaterMarker = marker;
+                Debug.Log("[HavenMoonVR] Water Enhanced VR applied to " + materialCount +
+                    " Water4 material(s): stronger Fresnel, sharper sun highlight, subtle foam boost and " +
+                    textureCount + " filtered water texture(s). Planar reflection remains disabled.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[HavenMoonVR] Could not apply Water Enhanced VR: " + ex.Message);
+            }
+        }
+
+        private static int EnhanceWaterTexture(Material material, string propertyName)
+        {
+            if (!material.HasProperty(propertyName)) return 0;
+            Texture texture = material.GetTexture(propertyName);
+            if (texture == null) return 0;
+            texture.anisoLevel = 8;
+            texture.filterMode = FilterMode.Trilinear;
+            return 1;
         }
 
         private static Type FindLoadedType(string fullName)

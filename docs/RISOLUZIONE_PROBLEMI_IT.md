@@ -8,11 +8,11 @@ Se non appaiono, riattiva e muovi entrambi i controller, controlla che SteamVR l
 
 ## La telecamera è troppo alta o troppo bassa
 
-Premi `F8` oppure `Y` per ricentrare. Usa `F7` per abbassare e `F9` per alzare in passi di 5 cm; la scelta viene memorizzata. La 1.2.1 corregge anche il doppio conteggio dell'offset originale di 0,683 m.
+Premi `F8` oppure `Y` per ricentrare. Usa `F7` per abbassare e `F9` per alzare in passi di 5 cm; la scelta viene memorizzata. La 1.2.6 conserva anche la correzione del doppio conteggio dell'offset originale di 0,683 m.
 
 ## Compare un cuneo nero tra oceano e cielo inclinando la testa
 
-Horizon Fix v3 disattiva i vecchi filtri a schermo intero `GlobalFog` e `GlobalFogWATER`, che calcolano una sola telecamera piatta invece delle due proiezioni oculari SteamVR. Restano attivi la nebbia nativa della scena, l'oceano e le onde; Water4 usa il percorso conservativo LOD 200 mantenendo disattivati GrabPass a schermo, riflessione planare ed edge blend.
+La versione 1.2.6 disattiva completamente la riflessione planare dell'oceano, eliminando i riflessi di cielo, nuvole e oggetti della scena. Water Enhanced VR ritocca soltanto Fresnel, colore, luce speculare, schiuma e filtraggio delle texture dell'acqua. `GlobalFog`, `GlobalFogWATER`, GrabPass e fusione della riva restano originali, quindi un difetto stereo può ancora comparire su alcune configurazioni. Non esiste una modalità F10: usa la 1.2.5 se preferisci l'acqua senza la nuova regolazione oppure la 1.2.2 per il rendering VR-safe più prudente.
 
 ## La grafica trema o l'immagine si sdoppia a intermittenza
 
@@ -42,7 +42,7 @@ Chiudi completamente Haven Moon e SteamVR. Steam può restare aperto se scegli l
 
 ## Registrazione Steam automatica o manuale
 
-Con **Automatica**, l'installer chiude Steam, salva `shortcuts.vdf`, registra `Haven Moon VR Community Patch` nella Libreria VR e riapre Steam anche se l'installazione termina con un errore. Con **Manuale**, Steam può restare aperto e l'installer non tocca il database: aggiungi `Haven Moon VR.exe` come gioco non di Steam, rinominalo `Haven Moon VR Community Patch` e abilita **Includi nella Libreria VR**. La disinstallazione non rimuove un collegamento creato manualmente.
+Con **Automatica**, l'installer chiude Haven Moon, SteamVR e Steam, salva `shortcuts.vdf`, registra `Haven Moon VR Community Patch` nella Libreria VR e riapre Steam anche se l'installazione termina con un errore. Con **Manuale**, Steam può restare aperto, Haven Moon e SteamVR devono essere già chiusi e l'installer non tocca il database: aggiungi `Haven Moon VR.exe` come gioco non di Steam, rinominalo `Haven Moon VR Community Patch` e abilita **Includi nella Libreria VR**. La disinstallazione non rimuove un collegamento creato manualmente.
 
 ## La grafica personalizzata non compare in Steam o SteamVR
 
@@ -56,4 +56,4 @@ Se compare `Package file missing`, non usare **Code → Download ZIP** e non avv
 
 ## Controllo installazione
 
-Esegui `Verify_Installation.cmd`. Se segnala `WRONG BUILD`, reinstalla la 1.2.1 usando l'intero contenuto dello ZIP.
+Esegui `Verify_Installation.cmd`. Se segnala `WRONG BUILD`, reinstalla la 1.2.6 usando l'intero contenuto dello ZIP.

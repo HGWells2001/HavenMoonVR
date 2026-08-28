@@ -1,9 +1,9 @@
 @echo off
-title HavenMoonVR OpenVR Input Bridge 1.2.1 Community Patch
+title HavenMoonVR OpenVR Input Bridge 1.2.6 Community Patch
 cd /d "%~dp0"
 
 echo ==========================================
-echo HavenMoonVR OpenVR Input Bridge 1.2.1 Community Patch
+echo HavenMoonVR OpenVR Input Bridge 1.2.6 Community Patch
 echo ==========================================
 echo.
 echo SteamVR verra' usato se aperto, oppure avviato automaticamente.

@@ -14,4 +14,4 @@ Existing object scripts still receive Fire1/Fire2, preserving the main/opposite 
 
 ## Visual profile
 
-Version 1.2.1 preserves Haven Moon's original post-processing, anti-aliasing and quality settings. It does not force colour grading, bloom, ambient occlusion, MSAA, anisotropic filtering, shadows, textures or scene LODs. Water4 uses its conservative 200-LOD path; the legacy screen GrabPass, planar reflection and edge blend remain disabled because they are unsafe for the two VR eye projections.
+Version 1.2.6 keeps the original Water4 path, screen GrabPass, shoreline blending, GlobalFog, post-processing and anti-aliasing. It disconnects `WaterTile.reflection` and disables `PlanarReflection`, then applies the targeted Water Enhanced VR Fresnel, specular, foam and texture-filtering adjustment. There is no F10 water-mode toggle.

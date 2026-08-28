@@ -15,7 +15,7 @@ Il pacchetto contiene immagini separate per le diverse schermate della Libreria:
 - `HavenMoonVR_AppIcon_184x184.jpg`: variante applicazione richiesta dalle specifiche Steam.
 - `HavenMoonVR_SteamVR_Background_1920x1080.png`: sfondo 16:9 alternativo per uso manuale.
 
-Con la registrazione **Automatica**, l'installer chiude Steam, calcola l'AppID esatto del collegamento non-Steam e installa Copertina, Intestazione, Hero, Logo e Icona nella cartella `userdata` dell'utente attivo. Al riavvio, Steam e l'interfaccia SteamVR usano la stessa grafica della Libreria.
+Con la registrazione **Automatica**, l'installer chiude Haven Moon, SteamVR e Steam, calcola l'AppID esatto del collegamento non-Steam e installa Copertina, Intestazione, Hero, Logo e Icona nella cartella `userdata` dell'utente attivo. Al riavvio, Steam e l'interfaccia SteamVR usano la stessa grafica della Libreria.
 
 Con la registrazione **Manuale**, Steam resta aperto e tutte le immagini vengono copiate in `HavenMoonVR_Artwork` dentro la cartella di Haven Moon. Dopo aver aggiunto `Haven Moon VR.exe` come gioco non di Steam:
 
@@ -40,7 +40,7 @@ The package provides separate images for each Steam Library presentation:
 - `HavenMoonVR_AppIcon_184x184.jpg`: Steam specification application-icon variant.
 - `HavenMoonVR_SteamVR_Background_1920x1080.png`: alternative 16:9 background for manual use.
 
-With **Automatic** registration, the installer closes Steam, obtains the exact non-Steam shortcut AppID, and installs the Capsule, Header, Hero, Logo and Icon in the active user's `userdata` directory. After Steam restarts, Steam and the SteamVR interface use the same Library artwork.
+With **Automatic** registration, the installer closes Haven Moon, SteamVR and Steam, obtains the exact non-Steam shortcut AppID, and installs the Capsule, Header, Hero, Logo and Icon in the active user's `userdata` directory. After Steam restarts, Steam and the SteamVR interface use the same Library artwork.
 
 With **Manual** registration, Steam remains open and every image is copied to `HavenMoonVR_Artwork` inside the Haven Moon directory. After adding `Haven Moon VR.exe` as a non-Steam game:
 
